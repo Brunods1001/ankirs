@@ -6,3 +6,8 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+clap = { version = "4.3.10", features = ["derive"]}
+dotenv = "0.15.0"
+sqlx = { version = "0.7.0", features = ["sqlite", "json", "time", "macros", "runtime-tokio"] }
+strum = { version = "0.25.0", features = ["derive"] }
+tokio = { version="1.29.1", features = ["full"] }
