@@ -1,11 +1,16 @@
 # Features
 I can use Anki to create decks, cards, and study them. I can also create a user account and login to save my progress.
 I can have sessions where I drill a deck. The results get stored in the database. I can view reports on my progress.
-- [ ] Card:
-    - [ ] Create migration file for card:
-        - [ ] id, name, front, back, created_at, updated_at
-- [ ] Create a menu with an event loop
-- [ ] Deck:
+- [X] Card:
+    - [X] Create migration file for card:
+        - [X] id, name, front, back, created_at, updated_at
+- [X] Create a menu with an event loop
+- [o] Deck:
+    - [X] Create
+    - [ ] Update
+    - [ ] Delete
+    - [X] List
+    - [ ] Add cards to deck
 - [ ] Session:
 - [ ] User:
     - [ ] CRUD user

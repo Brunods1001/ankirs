@@ -67,23 +67,24 @@ pub async fn update_card(
     Ok(())
 }
 
-
 pub async fn create_deck(
     tx: &mut Transaction<'_, Sqlite>,
     name: String,
     description: Option<String>,
 ) -> Result<(), sqlx::Error> {
     println!("Creating deck with name: {}", name);
-    sqlx::query!("INSERT INTO deck (name, description) VALUES (?, ?)", name, description)
-        .execute(tx.acquire().await?)
-        .await?;
+    sqlx::query!(
+        "INSERT INTO deck (name, description) VALUES (?, ?)",
+        name,
+        description
+    )
+    .execute(tx.acquire().await?)
+    .await?;
 
     Ok(())
 }
 
-pub async fn list_decks(
-    tx: &mut Transaction<'_, Sqlite>,
-) -> Result<(), sqlx::Error> {
+pub async fn list_decks(tx: &mut Transaction<'_, Sqlite>) -> Result<(), sqlx::Error> {
     let decks = sqlx::query_as!(ListDeck, "SELECT id, name, description FROM deck")
         .fetch_all(tx.acquire().await?)
         .await?;
@@ -93,7 +94,9 @@ pub async fn list_decks(
             "
             {}: | {} | {} |
             ",
-            deck.id, deck.name, deck.description.unwrap_or("".to_string())
+            deck.id,
+            deck.name,
+            deck.description.unwrap_or("".to_string())
         );
     }
 
@@ -114,6 +117,30 @@ pub async fn delete_card(tx: &mut Transaction<'_, Sqlite>, id: i64) -> Result<()
     }
 
     Ok(())
+}
+
+pub async fn query_deck_exists(
+    tx: &mut Transaction<'_, Sqlite>,
+    id: i64,
+) -> Result<bool, sqlx::Error> {
+    let res = sqlx::query!("SELECT id FROM deck WHERE id = ?", id)
+        .fetch_optional(tx.acquire().await?)
+        .await?;
+
+    println!("Deck with id: {} exists: {}", id, res.is_some());
+    Ok(res.is_some())
+}
+
+pub async fn query_deck_info(tx: &mut Transaction<'_, Sqlite>, id: i64) -> String {
+    let res = sqlx::query!("SELECT * FROM deck WHERE id = ?", id)
+        .fetch_one(tx.acquire().await.unwrap())
+        .await
+        .unwrap();
+
+    let (id, name, desc) = (res.id, res.name, res.description.unwrap_or("".to_string()));
+
+    format!("{id}, {name}, {desc}").to_string()
+
 }
 
 #[cfg(test)]
@@ -151,17 +178,19 @@ mod tests {
         tx.rollback().await.unwrap();
     }
 
-
     #[tokio::test]
     async fn test_update_card() {
         let mut tx = create_transaction().await;
 
-        let record_id = sqlx::query!("INSERT INTO card (front, back) VALUES (?, ?) RETURNING id", "front", "back")
-            .fetch_one(tx.acquire().await.unwrap())
-            .await
-            .unwrap()
-            .id;
-
+        let record_id = sqlx::query!(
+            "INSERT INTO card (front, back) VALUES (?, ?) RETURNING id",
+            "front",
+            "back"
+        )
+        .fetch_one(tx.acquire().await.unwrap())
+        .await
+        .unwrap()
+        .id;
 
         update_card(&mut tx, record_id, Some("new front".to_string()), None)
             .await
@@ -178,15 +207,18 @@ mod tests {
         tx.rollback().await.unwrap();
     }
 
-
     #[tokio::test]
     async fn test_delete_card() {
         let mut tx = create_transaction().await;
 
-        sqlx::query!("INSERT INTO card (front, back) VALUES (?, ?)", "front", "back")
-            .execute(tx.acquire().await.unwrap())
-            .await
-            .unwrap();
+        sqlx::query!(
+            "INSERT INTO card (front, back) VALUES (?, ?)",
+            "front",
+            "back"
+        )
+        .execute(tx.acquire().await.unwrap())
+        .await
+        .unwrap();
 
         delete_card(&mut tx, 1).await.unwrap();
 
@@ -204,15 +236,23 @@ mod tests {
     async fn test_list_cards() {
         let mut tx = create_transaction().await;
 
-        sqlx::query!("INSERT INTO card (front, back) VALUES (?, ?)", "front", "back")
-            .execute(tx.acquire().await.unwrap())
-            .await
-            .unwrap();
+        sqlx::query!(
+            "INSERT INTO card (front, back) VALUES (?, ?)",
+            "front",
+            "back"
+        )
+        .execute(tx.acquire().await.unwrap())
+        .await
+        .unwrap();
 
-        sqlx::query!("INSERT INTO card (front, back) VALUES (?, ?)", "front2", "back2")
-            .execute(tx.acquire().await.unwrap())
-            .await
-            .unwrap();
+        sqlx::query!(
+            "INSERT INTO card (front, back) VALUES (?, ?)",
+            "front2",
+            "back2"
+        )
+        .execute(tx.acquire().await.unwrap())
+        .await
+        .unwrap();
 
         list_cards(&mut tx).await.unwrap();
 
@@ -227,10 +267,11 @@ mod tests {
             .await
             .unwrap();
 
-        let deck = sqlx::query!("SELECT name, description FROM deck WHERE id = last_insert_rowid();")
-            .fetch_one(tx.acquire().await.unwrap())
-            .await
-            .unwrap();
+        let deck =
+            sqlx::query!("SELECT name, description FROM deck WHERE id = last_insert_rowid();")
+                .fetch_one(tx.acquire().await.unwrap())
+                .await
+                .unwrap();
 
         assert_eq!(deck.name, "deck");
         assert_eq!(deck.description, Some("description".to_string()));
@@ -242,15 +283,23 @@ mod tests {
     async fn test_list_decks() {
         let mut tx = create_transaction().await;
 
-        sqlx::query!("INSERT INTO deck (name, description) VALUES (?, ?)", "deck", "description")
-            .execute(tx.acquire().await.unwrap())
-            .await
-            .unwrap();
+        sqlx::query!(
+            "INSERT INTO deck (name, description) VALUES (?, ?)",
+            "deck",
+            "description"
+        )
+        .execute(tx.acquire().await.unwrap())
+        .await
+        .unwrap();
 
-        sqlx::query!("INSERT INTO deck (name, description) VALUES (?, ?)", "deck2", "description2")
-            .execute(tx.acquire().await.unwrap())
-            .await
-            .unwrap();
+        sqlx::query!(
+            "INSERT INTO deck (name, description) VALUES (?, ?)",
+            "deck2",
+            "description2"
+        )
+        .execute(tx.acquire().await.unwrap())
+        .await
+        .unwrap();
 
         list_decks(&mut tx).await.unwrap();
 
@@ -265,8 +314,7 @@ mod tests {
             .await
             .unwrap();
 
-        let res = create_deck(&mut tx, "deck".to_string(), Some("description".to_string()))
-            .await;
+        let res = create_deck(&mut tx, "deck".to_string(), Some("description".to_string())).await;
 
         assert_eq!(res.is_err(), true);
 
