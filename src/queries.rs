@@ -1,4 +1,4 @@
-use crate::models::ListCard;
+use crate::models::{ListCard, ListDeck};
 use sqlx::{Acquire, Sqlite, Transaction};
 
 pub async fn create_card(
@@ -62,6 +62,39 @@ pub async fn update_card(
         (None, None) => {
             println!("No changes to make");
         }
+    }
+
+    Ok(())
+}
+
+
+pub async fn create_deck(
+    tx: &mut Transaction<'_, Sqlite>,
+    name: String,
+    description: Option<String>,
+) -> Result<(), sqlx::Error> {
+    println!("Creating deck with name: {}", name);
+    sqlx::query!("INSERT INTO deck (name, description) VALUES (?, ?)", name, description)
+        .execute(tx.acquire().await?)
+        .await?;
+
+    Ok(())
+}
+
+pub async fn list_decks(
+    tx: &mut Transaction<'_, Sqlite>,
+) -> Result<(), sqlx::Error> {
+    let decks = sqlx::query_as!(ListDeck, "SELECT id, name, description FROM deck")
+        .fetch_all(tx.acquire().await?)
+        .await?;
+
+    for deck in decks {
+        println!(
+            "
+            {}: | {} | {} |
+            ",
+            deck.id, deck.name, deck.description.unwrap_or("".to_string())
+        );
     }
 
     Ok(())
@@ -182,6 +215,60 @@ mod tests {
             .unwrap();
 
         list_cards(&mut tx).await.unwrap();
+
+        tx.rollback().await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn test_create_deck() {
+        let mut tx = create_transaction().await;
+
+        create_deck(&mut tx, "deck".to_string(), Some("description".to_string()))
+            .await
+            .unwrap();
+
+        let deck = sqlx::query!("SELECT name, description FROM deck WHERE id = last_insert_rowid();")
+            .fetch_one(tx.acquire().await.unwrap())
+            .await
+            .unwrap();
+
+        assert_eq!(deck.name, "deck");
+        assert_eq!(deck.description, Some("description".to_string()));
+
+        tx.rollback().await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn test_list_decks() {
+        let mut tx = create_transaction().await;
+
+        sqlx::query!("INSERT INTO deck (name, description) VALUES (?, ?)", "deck", "description")
+            .execute(tx.acquire().await.unwrap())
+            .await
+            .unwrap();
+
+        sqlx::query!("INSERT INTO deck (name, description) VALUES (?, ?)", "deck2", "description2")
+            .execute(tx.acquire().await.unwrap())
+            .await
+            .unwrap();
+
+        list_decks(&mut tx).await.unwrap();
+
+        tx.rollback().await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn test_unique_deck_names() {
+        let mut tx = create_transaction().await;
+
+        create_deck(&mut tx, "deck".to_string(), Some("description".to_string()))
+            .await
+            .unwrap();
+
+        let res = create_deck(&mut tx, "deck".to_string(), Some("description".to_string()))
+            .await;
+
+        assert_eq!(res.is_err(), true);
 
         tx.rollback().await.unwrap();
     }
