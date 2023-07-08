@@ -3,7 +3,6 @@ mod models;
 mod queries;
 
 use app::start_app;
-use queries::{create_card, delete_card, list_cards, update_card};
 
 use dotenv::dotenv;
 use sqlx::sqlite::SqlitePoolOptions;
@@ -72,34 +71,30 @@ async fn main() -> Result<(), sqlx::Error> {
         .connect(&database_url)
         .await?;
 
-    let mut tx = pool.begin().await?;
-
     let cli = Cli::parse();
 
     match cli.command {
         Some(Commands::Start) => {
             println!("Starting app");
-            start_app(&mut tx).await?;
+            start_app(pool).await?;
         }
-        Some(Commands::Card { command }) => match command {
-            Some(CardCommands::List) => {
-                list_cards(&mut tx).await?;
-            }
-            Some(CardCommands::Create { front, back }) => {
-                create_card(&mut tx, front, back).await?;
-            }
-            Some(CardCommands::Update { id, front, back }) => {
-                update_card(&mut tx, id, front, back).await?;
-            }
-            Some(CardCommands::Delete { id }) => {
-                delete_card(&mut tx, id).await?;
-            }
-            None => println!("no command given"),
-        },
-        None => println!("no command given"),
+        _ => println!("no command given"),
+        // Some(Commands::Card { command }) => match command {
+        //     Some(CardCommands::List) => {
+        //         list_cards(&mut tx).await?;
+        //     }
+        //     Some(CardCommands::Create { front, back }) => {
+        //         create_card(&mut tx, front, back).await?;
+        //     }
+        //     Some(CardCommands::Update { id, front, back }) => {
+        //         update_card(&mut tx, id, front, back).await?;
+        //     }
+        //     Some(CardCommands::Delete { id }) => {
+        //         delete_card(&mut tx, id).await?;
+        //     }
+        //     None => println!("no command given"),
+        // },
     }
-
-    tx.commit().await?;
 
     Ok(())
 }

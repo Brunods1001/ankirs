@@ -1,4 +1,4 @@
-use crate::models::ListCard;
+use crate::models::{ListCard, ListDeck};
 use sqlx::{Acquire, Sqlite, Transaction};
 
 pub async fn create_card(
@@ -27,6 +27,49 @@ pub async fn list_cards(tx: &mut Transaction<'_, Sqlite>) -> Result<(), sqlx::Er
             card.id, card.front, card.back
         );
     }
+
+    Ok(())
+}
+
+pub async fn list_cards_for_deck(tx: &mut Transaction<'_, Sqlite>, deck_id: i64) -> Result<(), sqlx::Error> {
+    let cards = sqlx::query_as!(
+        ListCard,
+        r#"
+        SELECT id, front, back 
+        FROM card 
+        LEFT JOIN card_deck ON card.id = card_deck.card_id
+        WHERE deck_id = ?
+        "#,
+        deck_id
+    )
+    .fetch_all(tx.acquire().await?)
+    .await?;
+
+    for card in cards {
+        println!(
+            "
+            {}: | {} | {} |
+            ",
+            card.id, card.front, card.back
+        );
+    }
+
+    Ok(())
+}
+
+pub async fn add_card_to_deck(
+    tx: &mut Transaction<'_, Sqlite>,
+    card_id: i64,
+    deck_id: i64,
+) -> Result<(), sqlx::Error> {
+    println!("Adding card with id {} to deck with id {}", card_id, deck_id);
+    sqlx::query!(
+        "INSERT INTO card_deck (card_id, deck_id) VALUES (?, ?)",
+        card_id,
+        deck_id
+    )
+    .execute(tx.acquire().await?)
+    .await?;
 
     Ok(())
 }
@@ -67,6 +110,77 @@ pub async fn update_card(
     Ok(())
 }
 
+pub async fn create_deck(
+    tx: &mut Transaction<'_, Sqlite>,
+    name: String,
+    description: Option<String>,
+) -> Result<(), sqlx::Error> {
+    println!("Creating deck with name: {}", name);
+    sqlx::query!(
+        "INSERT INTO deck (name, description) VALUES (?, ?)",
+        name,
+        description
+    )
+    .execute(tx.acquire().await?)
+    .await?;
+
+    Ok(())
+}
+
+pub async fn update_deck(
+    tx: &mut Transaction<'_, Sqlite>,
+    id: i64,
+    name: String,
+    description: Option<String>,
+) -> Result<(), sqlx::Error> {
+    println!("Creating deck with name: {}", name);
+    sqlx::query!(
+        "UPDATE deck SET name = ?, description = ? WHERE id = ?",
+        name,
+        description,
+        id
+    )
+    .execute(tx.acquire().await?)
+    .await?;
+
+    Ok(())
+}
+
+pub async fn delete_deck(tx: &mut Transaction<'_, Sqlite>, id: i64) -> Result<(), sqlx::Error> {
+    println!("Deleting deck with id: {}", id);
+    let res = sqlx::query!("DELETE FROM deck WHERE id = ?", id)
+        .execute(tx.acquire().await?)
+        .await?
+        .rows_affected();
+
+    if res == 0 {
+        println!("No deck with id: {} found", id);
+    } else {
+        println!("Deleted deck with id: {}", id);
+    }
+
+    Ok(())
+}
+
+pub async fn list_decks(tx: &mut Transaction<'_, Sqlite>) -> Result<(), sqlx::Error> {
+    let decks = sqlx::query_as!(ListDeck, "SELECT id, name, description FROM deck")
+        .fetch_all(tx.acquire().await?)
+        .await?;
+
+    for deck in decks {
+        println!(
+            "
+            {}: | {} | {} |
+            ",
+            deck.id,
+            deck.name,
+            deck.description.unwrap_or("".to_string())
+        );
+    }
+
+    Ok(())
+}
+
 pub async fn delete_card(tx: &mut Transaction<'_, Sqlite>, id: i64) -> Result<(), sqlx::Error> {
     println!("Deleting card with id: {}", id);
     let res = sqlx::query!("DELETE FROM card WHERE id = ?", id)
@@ -81,6 +195,30 @@ pub async fn delete_card(tx: &mut Transaction<'_, Sqlite>, id: i64) -> Result<()
     }
 
     Ok(())
+}
+
+pub async fn query_deck_exists(
+    tx: &mut Transaction<'_, Sqlite>,
+    id: i64,
+) -> Result<bool, sqlx::Error> {
+    let res = sqlx::query!("SELECT id FROM deck WHERE id = ?", id)
+        .fetch_optional(tx.acquire().await?)
+        .await?;
+
+    println!("Deck with id: {} exists: {}", id, res.is_some());
+    Ok(res.is_some())
+}
+
+pub async fn query_deck_info(tx: &mut Transaction<'_, Sqlite>, id: i64) -> String {
+    let res = sqlx::query!("SELECT * FROM deck WHERE id = ?", id)
+        .fetch_one(tx.acquire().await.unwrap())
+        .await
+        .unwrap();
+
+    let (id, name, desc) = (res.id, res.name, res.description.unwrap_or("".to_string()));
+
+    format!("{id}, {name}, {desc}").to_string()
+
 }
 
 #[cfg(test)]
@@ -118,17 +256,19 @@ mod tests {
         tx.rollback().await.unwrap();
     }
 
-
     #[tokio::test]
     async fn test_update_card() {
         let mut tx = create_transaction().await;
 
-        let record_id = sqlx::query!("INSERT INTO card (front, back) VALUES (?, ?) RETURNING id", "front", "back")
-            .fetch_one(tx.acquire().await.unwrap())
-            .await
-            .unwrap()
-            .id;
-
+        let record_id = sqlx::query!(
+            "INSERT INTO card (front, back) VALUES (?, ?) RETURNING id",
+            "front",
+            "back"
+        )
+        .fetch_one(tx.acquire().await.unwrap())
+        .await
+        .unwrap()
+        .id;
 
         update_card(&mut tx, record_id, Some("new front".to_string()), None)
             .await
@@ -145,15 +285,18 @@ mod tests {
         tx.rollback().await.unwrap();
     }
 
-
     #[tokio::test]
     async fn test_delete_card() {
         let mut tx = create_transaction().await;
 
-        sqlx::query!("INSERT INTO card (front, back) VALUES (?, ?)", "front", "back")
-            .execute(tx.acquire().await.unwrap())
-            .await
-            .unwrap();
+        sqlx::query!(
+            "INSERT INTO card (front, back) VALUES (?, ?)",
+            "front",
+            "back"
+        )
+        .execute(tx.acquire().await.unwrap())
+        .await
+        .unwrap();
 
         delete_card(&mut tx, 1).await.unwrap();
 
@@ -171,17 +314,87 @@ mod tests {
     async fn test_list_cards() {
         let mut tx = create_transaction().await;
 
-        sqlx::query!("INSERT INTO card (front, back) VALUES (?, ?)", "front", "back")
-            .execute(tx.acquire().await.unwrap())
-            .await
-            .unwrap();
+        sqlx::query!(
+            "INSERT INTO card (front, back) VALUES (?, ?)",
+            "front",
+            "back"
+        )
+        .execute(tx.acquire().await.unwrap())
+        .await
+        .unwrap();
 
-        sqlx::query!("INSERT INTO card (front, back) VALUES (?, ?)", "front2", "back2")
-            .execute(tx.acquire().await.unwrap())
-            .await
-            .unwrap();
+        sqlx::query!(
+            "INSERT INTO card (front, back) VALUES (?, ?)",
+            "front2",
+            "back2"
+        )
+        .execute(tx.acquire().await.unwrap())
+        .await
+        .unwrap();
 
         list_cards(&mut tx).await.unwrap();
+
+        tx.rollback().await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn test_create_deck() {
+        let mut tx = create_transaction().await;
+
+        create_deck(&mut tx, "deck".to_string(), Some("description".to_string()))
+            .await
+            .unwrap();
+
+        let deck =
+            sqlx::query!("SELECT name, description FROM deck WHERE id = last_insert_rowid();")
+                .fetch_one(tx.acquire().await.unwrap())
+                .await
+                .unwrap();
+
+        assert_eq!(deck.name, "deck");
+        assert_eq!(deck.description, Some("description".to_string()));
+
+        tx.rollback().await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn test_list_decks() {
+        let mut tx = create_transaction().await;
+
+        sqlx::query!(
+            "INSERT INTO deck (name, description) VALUES (?, ?)",
+            "deck",
+            "description"
+        )
+        .execute(tx.acquire().await.unwrap())
+        .await
+        .unwrap();
+
+        sqlx::query!(
+            "INSERT INTO deck (name, description) VALUES (?, ?)",
+            "deck2",
+            "description2"
+        )
+        .execute(tx.acquire().await.unwrap())
+        .await
+        .unwrap();
+
+        list_decks(&mut tx).await.unwrap();
+
+        tx.rollback().await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn test_unique_deck_names() {
+        let mut tx = create_transaction().await;
+
+        create_deck(&mut tx, "deck".to_string(), Some("description".to_string()))
+            .await
+            .unwrap();
+
+        let res = create_deck(&mut tx, "deck".to_string(), Some("description".to_string())).await;
+
+        assert_eq!(res.is_err(), true);
 
         tx.rollback().await.unwrap();
     }
