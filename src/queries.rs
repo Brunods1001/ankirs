@@ -1,17 +1,20 @@
-use crate::models::{ListCard, ListDeck};
+use std::io;
+
+use crate::models::{ListCard, ListDeck, Card};
 use sqlx::{Acquire, Sqlite, Transaction};
 
 pub async fn create_card(
     tx: &mut Transaction<'_, Sqlite>,
     front: String,
     back: String,
-) -> Result<(), sqlx::Error> {
+) -> Result<i64, sqlx::Error> {
     println!("Creating card with front: {}, back: {}", front, back);
-    sqlx::query!("INSERT INTO card (front, back) VALUES (?, ?)", front, back)
-        .execute(tx.acquire().await?)
-        .await?;
+    let id = sqlx::query!("INSERT INTO card (front, back) VALUES (?, ?) RETURNING id;", front, back)
+        .fetch_one(tx.acquire().await?)
+        .await?
+        .id;
 
-    Ok(())
+    Ok(id)
 }
 
 pub async fn list_cards(tx: &mut Transaction<'_, Sqlite>) -> Result<(), sqlx::Error> {
@@ -219,6 +222,55 @@ pub async fn query_deck_info(tx: &mut Transaction<'_, Sqlite>, id: i64) -> Strin
 
     format!("{id}, {name}, {desc}").to_string()
 
+}
+
+pub async fn review_deck(tx: &mut Transaction<'_, Sqlite>, id: i64) -> Result<(), sqlx::Error> {
+    // TODO: add limit
+    let mut cards = sqlx::query_as!(
+        Card,
+        r#"
+        SELECT id, front, back 
+        FROM card 
+        WHERE id IN (
+            SELECT card_id 
+            FROM card_deck 
+            WHERE deck_id = ?)
+        ORDER BY RANDOM();
+        "#,
+        id
+    )
+    .fetch_all(tx.acquire().await?)
+    .await?;
+
+    let mut correct = 0;
+    let mut incorrect = 0;
+
+    while !cards.is_empty() {
+        let card = cards.pop().unwrap();
+        println!("Front: {}", card.front);
+        println!("What is the back?");
+        let mut input = String::new();
+        io::stdin()
+            .read_line(&mut input)
+            .expect("Failed to read line");
+
+        // TODO: add similarity function
+        if input.trim() == card.back {
+            println!("Correct!");
+            correct += 1;
+        } else {
+            println!("Incorrect!");
+            incorrect += 1;
+            cards.push(card);
+        }
+    }
+
+    println!(
+        "You got {} correct and {} incorrect",
+        correct, incorrect
+    );
+
+    Ok(())
 }
 
 #[cfg(test)]
