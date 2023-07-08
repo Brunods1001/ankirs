@@ -5,7 +5,7 @@ use sqlx::{Acquire, Sqlite, Transaction};
 
 use bcrypt::{hash, DEFAULT_COST};
 
-pub async fn create_user(
+pub async fn _create_user(
     tx: &mut Transaction<'_, Sqlite>,
     username: String,
     password: String,

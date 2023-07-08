@@ -1,3 +1,5 @@
+use crate::app::state::AppState;
+
 use super::utils::parse_input;
 use super::MenuState;
 
@@ -36,6 +38,7 @@ pub trait DecisionMaker {
     async fn make_decision(
         self,
         tx: &mut Transaction<'_, Sqlite>,
+        state: &AppState,
     ) -> Result<(MenuState, bool), sqlx::Error>;
     // async fn make_decision<'a>(&'a self, tx: &mut Transaction<'_, Sqlite>) -> Result<(&'a Self, bool), sqlx::Error>;
 }
@@ -45,5 +48,6 @@ pub trait ProcessOption {
     async fn process(
         self,
         tx: &mut Transaction<'_, Sqlite>,
+        state: &AppState,
     ) -> Result<(MenuState, bool), sqlx::Error>;
 }

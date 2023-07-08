@@ -2,7 +2,7 @@ use crate::app::menus::MenuState;
 use crate::models::User;
 use colored::*;
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct AppState {
     pub current_menu: MenuState,
     navigation_stack: Vec<MenuState>,
@@ -36,6 +36,7 @@ impl AppState {
     pub fn get_previous_menu(&mut self) -> MenuState {
         // print navigation stack
         println!("{}", format!("Navigation stack {:?}", self.navigation_stack).green().bold());
+        self.navigation_stack.pop();
         let previous_menu = self.navigation_stack.last().unwrap().clone();
         println!("{}", format!("Previous menu {:?}", previous_menu).green().bold());
         previous_menu

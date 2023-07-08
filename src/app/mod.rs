@@ -41,7 +41,7 @@ pub async fn start_app(pool: SqlitePool) -> Result<(), sqlx::Error> {
 
     loop {
         let mut tx = pool.begin().await?;
-        let (next_state, should_continue) = app_state.current_menu.make_decision(&mut tx).await?;
+        let (next_state, should_continue) = app_state.current_menu.make_decision(&mut tx, &app_state).await?;
         app_state.navigate(next_state);
 
         if !should_continue {

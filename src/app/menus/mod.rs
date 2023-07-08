@@ -6,6 +6,7 @@ pub mod utils;
 use self::traits::{DecisionMaker, MenuOptions, ProcessOption};
 use super::menus::deck::{DeckDetailMenuOptions, DeckMenuOptions};
 use super::menus::card::{CardMenuOptions, CardSubMenuOptions};
+use super::state::AppState;
 use async_trait::async_trait;
 use sqlx::{Sqlite, Transaction};
 
@@ -35,19 +36,20 @@ impl DecisionMaker for MenuState {
     async fn make_decision(
         self,
         tx: &mut Transaction<'_, Sqlite>,
+        state: &AppState,
     ) -> Result<(MenuState, bool), sqlx::Error> {
         println!("Making decision for {:?}", self);
         match self {
             MenuState::MainMenu => {
                 MenuOption::print_menu();
                 let menu_choice = MenuOption::from_input().unwrap();
-                menu_choice.process(tx).await
+                menu_choice.process(tx, state).await
             }
             MenuState::DeckMenu => {
                 DeckMenuOptions::print_menu();
                 let deck_menu_choice = DeckMenuOptions::from_input().unwrap();
                 println!("Deck menu choice is {:?}", deck_menu_choice);
-                deck_menu_choice.process(tx).await
+                deck_menu_choice.process(tx, state).await
             }
             MenuState::DeckDetailMenu(id) => {
                 println!("Inside menu state: DeckDetailMenu ID: {}", id);
@@ -60,23 +62,23 @@ impl DecisionMaker for MenuState {
                     DeckDetailMenuOptions::ListAllCards(_) => DeckDetailMenuOptions::ListAllCards(id),
                     DeckDetailMenuOptions::Review(_) => DeckDetailMenuOptions::Review(id),
                     DeckDetailMenuOptions::CreateCard(_) => DeckDetailMenuOptions::CreateCard(id),
-                    DeckDetailMenuOptions::GoBack(state) => DeckDetailMenuOptions::GoBack(state),
+                    DeckDetailMenuOptions::GoBack(_) => DeckDetailMenuOptions::GoBack(state.clone()),
                     DeckDetailMenuOptions::Quit => DeckDetailMenuOptions::Quit,
                 };
 
                 println!("CHOOSING DECK DETAIL MENU {:?}", deck_detail_menu_choice);
 
-                deck_detail_menu_choice.process(tx).await
+                deck_detail_menu_choice.process(tx, state).await
             }
             MenuState::CardMenu => {
                 CardMenuOptions::print_menu();
                 let card_menu_choice = CardMenuOptions::from_input().unwrap();
-                card_menu_choice.process(tx).await
+                card_menu_choice.process(tx, state).await
             }
             MenuState::CardSubMenu => {
                 CardSubMenuOptions::print_menu();
                 let card_sub_menu_choice = CardSubMenuOptions::from_input().unwrap();
-                card_sub_menu_choice.process(tx).await
+                card_sub_menu_choice.process(tx, state).await
             }
         }
     }
@@ -90,17 +92,18 @@ impl ProcessOption for MenuOption {
     async fn process(
         self,
         tx: &mut Transaction<'_, Sqlite>,
+        state: &AppState,
     ) -> Result<(MenuState, bool), sqlx::Error> {
         match self {
             MenuOption::DeckMenu => {
                 DeckMenuOptions::print_menu();
                 let deck_menu_choice = DeckMenuOptions::from_input().unwrap();
-                return deck_menu_choice.process(tx).await;
+                return deck_menu_choice.process(tx, state).await;
             }
             MenuOption::CardMenu => {
                 CardMenuOptions::print_menu();
                 let card_menu_choice = CardMenuOptions::from_input().unwrap();
-                return card_menu_choice.process(tx).await;
+                return card_menu_choice.process(tx, state).await;
             }
             MenuOption::Quit => {
                 return Ok((MenuState::MainMenu, false));

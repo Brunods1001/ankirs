@@ -36,6 +36,7 @@ impl ProcessOption for CardMenuOptions {
     async fn process(
         self,
         tx: &mut Transaction<'_, Sqlite>,
+        _state: &AppState,
     ) -> Result<(MenuState, bool), sqlx::Error> {
         match self {
             CardMenuOptions::Create => {
@@ -92,6 +93,7 @@ impl ProcessOption for CardSubMenuOptions {
     async fn process(
         self,
         tx: &mut Transaction<'_, Sqlite>,
+        _state: &AppState,
     ) -> Result<(MenuState, bool), sqlx::Error> {
         match self {
             CardSubMenuOptions::Front => {

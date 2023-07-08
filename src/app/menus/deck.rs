@@ -52,6 +52,7 @@ impl ProcessOption for DeckMenuOptions {
     async fn process(
         self,
         tx: &mut Transaction<'_, Sqlite>,
+        _state: &AppState,
     ) -> Result<(MenuState, bool), sqlx::Error> {
         match self {
             DeckMenuOptions::Create => {
@@ -101,6 +102,7 @@ impl ProcessOption for DeckDetailMenuOptions {
     async fn process(
         self,
         tx: &mut Transaction<'_, Sqlite>,
+        _state: &AppState,
     ) -> Result<(MenuState, bool), sqlx::Error> {
         println!("Making DeckDetailMenuOptions decision for {:?}", self);
         match self {
