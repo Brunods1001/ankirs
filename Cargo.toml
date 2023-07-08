@@ -8,6 +8,7 @@ edition = "2021"
 [dependencies]
 async-trait = "0.1.71"
 clap = { version = "4.3.10", features = ["derive"]}
+colored = "2.0.4"
 dotenv = "0.15.0"
 log = "0.4.19"
 sqlx = { version = "0.7.0", features = ["sqlite", "json", "time", "macros", "runtime-tokio"] }

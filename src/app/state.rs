@@ -1,4 +1,5 @@
 use crate::app::menus::MenuState;
+use colored::*;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct AppState {
@@ -21,6 +22,7 @@ impl AppState {
     }
 
     pub fn navigate(&mut self, new_menu: MenuState) {
+        println!("{}", format!("Navigating to {:?}", new_menu).red().bold());
         if self.current_menu == new_menu {
             return;
         }
@@ -32,4 +34,3 @@ impl AppState {
         self.navigation_stack.pop().unwrap()
     }
 }
-

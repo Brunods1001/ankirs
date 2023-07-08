@@ -5,7 +5,7 @@ use sqlx::SqlitePool;
 use std::io::{self, Write};
 use std::process::Command;
 
-use crate::app::menus::DecisionMaker;
+use crate::app::menus::traits::DecisionMaker;
 use crate::app::state::AppState;
 
 fn _clear_screen() {
@@ -48,7 +48,7 @@ pub async fn start_app(pool: SqlitePool) -> Result<(), sqlx::Error> {
 mod tests {
     #[tokio::test]
     async fn test_parse_input() {
-        use crate::app::menus::{parse_input, CardMenuOptions};
+        use crate::app::menus::{utils::parse_input, CardMenuOptions};
         assert_eq!(
             parse_input::<CardMenuOptions>("1"),
             Some(CardMenuOptions::Create)

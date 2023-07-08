@@ -71,7 +71,6 @@ async fn main() -> Result<(), sqlx::Error> {
         .connect(&database_url)
         .await?;
 
-
     let cli = Cli::parse();
 
     match cli.command {
@@ -96,7 +95,6 @@ async fn main() -> Result<(), sqlx::Error> {
         //     None => println!("no command given"),
         // },
     }
-
 
     Ok(())
 }
