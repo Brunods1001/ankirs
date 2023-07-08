@@ -5,8 +5,10 @@ use sqlx::SqlitePool;
 use std::io::{self, Write};
 use std::process::Command;
 
+use crate::auth::login;
 use crate::app::menus::traits::DecisionMaker;
 use crate::app::state::AppState;
+use crate::models::User;
 
 fn _clear_screen() {
     if cfg!(target_os = "windows") {
@@ -25,7 +27,17 @@ fn _clear_screen() {
 pub async fn start_app(pool: SqlitePool) -> Result<(), sqlx::Error> {
     println!("Starting app");
 
-    let mut app_state = AppState::new();
+    // log in
+    let user: User = match login() {
+        Ok(user) => user,
+        Err(e) => {
+            panic!("Error logging in {}", e);
+        }
+    };
+
+    println!("Logged in as {:?}", user);
+
+    let mut app_state = AppState::new(user);
 
     loop {
         let mut tx = pool.begin().await?;

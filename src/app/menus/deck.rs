@@ -1,6 +1,7 @@
 use super::traits::{MenuOptions, ProcessOption};
 use super::utils::{parse_input, prompt_for_card_id, prompt_for_deck_details, prompt_for_deck_id};
 use super::MenuState;
+
 use crate::app::menus::utils::prompt_for_card_details;
 use crate::app::state::AppState;
 use crate::queries::{

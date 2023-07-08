@@ -1,23 +1,26 @@
 use crate::app::menus::MenuState;
+use crate::models::User;
 use colored::*;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct AppState {
     pub current_menu: MenuState,
     navigation_stack: Vec<MenuState>,
+    user: User
 }
 
 impl Default for AppState {
     fn default() -> Self {
-        Self::new()
+        Self::new(User::guest())
     }
 }
 
 impl AppState {
-    pub fn new() -> Self {
+    pub fn new(user: User) -> Self {
         Self {
             current_menu: MenuState::MainMenu,
             navigation_stack: vec![MenuState::MainMenu],
+            user
         }
     }
 

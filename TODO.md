@@ -1,20 +1,37 @@
 # Features
 I can use Anki to create decks, cards, and study them. I can also create a user account and login to save my progress.
 I can have sessions where I drill a deck. The results get stored in the database. I can view reports on my progress.
-- [X] Card:
-    - [X] Create migration file for card:
+- [o] Card:
+    - [o] Create migration file for card:
         - [X] id, name, front, back, created_at, updated_at
+    - [ ] Add tags to a card (alternative to decks)
 - [X] Create a menu with an event loop
-- [o] Deck:
+- [O] Deck:
     - [X] Create
-    - [ ] Update
-    - [ ] Delete
+    - [X] Update
+    - [X] Delete
     - [X] List
-    - [ ] Add cards to deck
-- [ ] Session:
+    - [X] Add cards to deck
+- [ ] User:
+    - [ ] CRUD user
+    - [ ] use bcrypt to hash passwords
+- [ ] Review a deck:
+    - [ ] Create a session
+    - [ ] Show a card
+    - [ ] Grade the card
+    - [ ] Show the next card
+    - [ ] Save the session
+    - [ ] Show a report
+- [X] Session:
+- [ ] Card history:
+    - [ ] User card history
 - [ ] User:
     - [ ] CRUD user
     - [ ] auth
+- [ ] Reports:
+    - [ ] use functions to generate reports
+    - [ ] needs to compare given answer with correct answer
+    - [ ] a modular solution that can use different algorithms
 
 - [ ] BONUS: Add TUI support for reports
 - [ ] BONUS: Create a Tauri app:

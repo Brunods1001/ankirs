@@ -1,7 +1,28 @@
 use std::io;
 
-use crate::models::{ListCard, ListDeck, Card};
+use crate::models::{Card, ListCard, ListDeck};
 use sqlx::{Acquire, Sqlite, Transaction};
+
+use bcrypt::{hash, DEFAULT_COST};
+
+pub async fn create_user(
+    tx: &mut Transaction<'_, Sqlite>,
+    username: String,
+    password: String,
+) -> Result<i64, sqlx::Error> {
+    println!("Creating user with username: {}", username);
+    let password_hash = hash(password, DEFAULT_COST).unwrap();
+    let id = sqlx::query!(
+        "INSERT INTO user (username, password_hash) VALUES (?, ?) RETURNING id;",
+        username,
+        password_hash
+    )
+    .fetch_one(tx.acquire().await?)
+    .await?
+    .id;
+
+    Ok(id)
+}
 
 pub async fn create_card(
     tx: &mut Transaction<'_, Sqlite>,
@@ -9,10 +30,14 @@ pub async fn create_card(
     back: String,
 ) -> Result<i64, sqlx::Error> {
     println!("Creating card with front: {}, back: {}", front, back);
-    let id = sqlx::query!("INSERT INTO card (front, back) VALUES (?, ?) RETURNING id;", front, back)
-        .fetch_one(tx.acquire().await?)
-        .await?
-        .id;
+    let id = sqlx::query!(
+        "INSERT INTO card (front, back) VALUES (?, ?) RETURNING id;",
+        front,
+        back
+    )
+    .fetch_one(tx.acquire().await?)
+    .await?
+    .id;
 
     Ok(id)
 }
@@ -34,7 +59,10 @@ pub async fn list_cards(tx: &mut Transaction<'_, Sqlite>) -> Result<(), sqlx::Er
     Ok(())
 }
 
-pub async fn list_cards_for_deck(tx: &mut Transaction<'_, Sqlite>, deck_id: i64) -> Result<(), sqlx::Error> {
+pub async fn list_cards_for_deck(
+    tx: &mut Transaction<'_, Sqlite>,
+    deck_id: i64,
+) -> Result<(), sqlx::Error> {
     let cards = sqlx::query_as!(
         ListCard,
         r#"
@@ -65,7 +93,10 @@ pub async fn add_card_to_deck(
     card_id: i64,
     deck_id: i64,
 ) -> Result<(), sqlx::Error> {
-    println!("Adding card with id {} to deck with id {}", card_id, deck_id);
+    println!(
+        "Adding card with id {} to deck with id {}",
+        card_id, deck_id
+    );
     sqlx::query!(
         "INSERT INTO card_deck (card_id, deck_id) VALUES (?, ?)",
         card_id,
@@ -221,7 +252,6 @@ pub async fn query_deck_info(tx: &mut Transaction<'_, Sqlite>, id: i64) -> Strin
     let (id, name, desc) = (res.id, res.name, res.description.unwrap_or("".to_string()));
 
     format!("{id}, {name}, {desc}").to_string()
-
 }
 
 pub async fn review_deck(tx: &mut Transaction<'_, Sqlite>, id: i64) -> Result<(), sqlx::Error> {
@@ -265,10 +295,7 @@ pub async fn review_deck(tx: &mut Transaction<'_, Sqlite>, id: i64) -> Result<()
         }
     }
 
-    println!(
-        "You got {} correct and {} incorrect",
-        correct, incorrect
-    );
+    println!("You got {} correct and {} incorrect", correct, incorrect);
 
     Ok(())
 }
