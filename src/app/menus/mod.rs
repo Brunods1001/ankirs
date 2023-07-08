@@ -58,6 +58,8 @@ impl DecisionMaker for MenuState {
                     DeckDetailMenuOptions::ListCards(_) => DeckDetailMenuOptions::ListCards(id),
                     DeckDetailMenuOptions::AddCard(_) => DeckDetailMenuOptions::AddCard(id),
                     DeckDetailMenuOptions::ListAllCards(_) => DeckDetailMenuOptions::ListAllCards(id),
+                    DeckDetailMenuOptions::Review(_) => DeckDetailMenuOptions::Review(id),
+                    DeckDetailMenuOptions::CreateCard(_) => DeckDetailMenuOptions::CreateCard(id),
                     DeckDetailMenuOptions::GoBack(state) => DeckDetailMenuOptions::GoBack(state),
                     DeckDetailMenuOptions::Quit => DeckDetailMenuOptions::Quit,
                 };

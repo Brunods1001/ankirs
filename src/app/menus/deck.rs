@@ -1,9 +1,11 @@
 use super::traits::{MenuOptions, ProcessOption};
-use super::utils::{parse_input, prompt_for_deck_details, prompt_for_deck_id, prompt_for_card_id};
+use super::utils::{parse_input, prompt_for_card_id, prompt_for_deck_details, prompt_for_deck_id};
 use super::MenuState;
+use crate::app::menus::utils::prompt_for_card_details;
 use crate::app::state::AppState;
 use crate::queries::{
-    create_deck, delete_deck, list_decks, query_deck_exists, query_deck_info, update_deck, list_cards_for_deck, add_card_to_deck, list_cards,
+    add_card_to_deck, create_card, create_deck, delete_deck, list_cards, list_cards_for_deck,
+    list_decks, query_deck_exists, query_deck_info, review_deck, update_deck,
 };
 use async_trait::async_trait;
 use sqlx::{Sqlite, Transaction};
@@ -26,6 +28,8 @@ pub enum DeckDetailMenuOptions {
     ListAllCards(i64),
     ListCards(i64),
     AddCard(i64),
+    CreateCard(i64),
+    Review(i64),
     GoBack(AppState),
     Quit,
 }
@@ -119,6 +123,23 @@ impl ProcessOption for DeckDetailMenuOptions {
                 println!("Adding a card to deck with id {}", id);
                 let card_id = prompt_for_card_id()?;
                 add_card_to_deck(tx, card_id, id).await?;
+                return Ok((MenuState::DeckDetailMenu(id), true));
+            }
+            DeckDetailMenuOptions::CreateCard(id) => {
+                println!("Creating a card for deck with id {}", id);
+                let (front, back) = prompt_for_card_details()?;
+                let card_id = create_card(
+                    tx,
+                    front.unwrap_or("".to_string()),
+                    back.unwrap_or("".to_string()),
+                )
+                .await?;
+                add_card_to_deck(tx, card_id, id).await?;
+                return Ok((MenuState::DeckDetailMenu(id), true));
+            }
+            DeckDetailMenuOptions::Review(id) => {
+                println!("Reviewing a deck with id {}", id);
+                review_deck(tx, id).await?;
                 return Ok((MenuState::DeckDetailMenu(id), true));
             }
             DeckDetailMenuOptions::GoBack(mut state) => {
