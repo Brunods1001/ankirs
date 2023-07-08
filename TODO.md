@@ -13,6 +13,7 @@ I can have sessions where I drill a deck. The results get stored in the database
     - [X] List
     - [X] Add cards to deck
 - [ ] User:
+    - [ ] choose to log in as guest
     - [ ] CRUD user
     - [ ] use bcrypt to hash passwords
 - [ ] Review a deck:

@@ -7,7 +7,7 @@ use std::fmt::Display;
 use std::io::{self, Write};
 use strum::IntoEnumIterator;
 
-pub trait MenuOptions: IntoEnumIterator + Display + Sized + PartialEq + Clone {
+pub trait MenuOptions: IntoEnumIterator + Display + Sized + PartialEq {
     fn print_menu() {
         println!("What would you like to do?");
         for option in Self::iter().enumerate() {
