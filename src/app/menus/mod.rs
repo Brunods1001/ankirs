@@ -22,7 +22,6 @@ pub enum MenuState {
 
 #[derive(EnumIter, Display, Debug, PartialEq, Clone, Copy)]
 enum MenuOption {
-    // CardMenu(CardMenuOptions),
     DeckMenu,
     CardMenu,
     Quit,
@@ -56,6 +55,9 @@ impl DecisionMaker for MenuState {
                 let deck_detail_menu_choice = DeckDetailMenuOptions::from_input().unwrap();
                 let deck_detail_menu_choice = match deck_detail_menu_choice {
                     DeckDetailMenuOptions::View(_) => DeckDetailMenuOptions::View(id),
+                    DeckDetailMenuOptions::ListCards(_) => DeckDetailMenuOptions::ListCards(id),
+                    DeckDetailMenuOptions::AddCard(_) => DeckDetailMenuOptions::AddCard(id),
+                    DeckDetailMenuOptions::ListAllCards(_) => DeckDetailMenuOptions::ListAllCards(id),
                     DeckDetailMenuOptions::GoBack(state) => DeckDetailMenuOptions::GoBack(state),
                     DeckDetailMenuOptions::Quit => DeckDetailMenuOptions::Quit,
                 };

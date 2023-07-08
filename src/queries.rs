@@ -31,6 +31,49 @@ pub async fn list_cards(tx: &mut Transaction<'_, Sqlite>) -> Result<(), sqlx::Er
     Ok(())
 }
 
+pub async fn list_cards_for_deck(tx: &mut Transaction<'_, Sqlite>, deck_id: i64) -> Result<(), sqlx::Error> {
+    let cards = sqlx::query_as!(
+        ListCard,
+        r#"
+        SELECT id, front, back 
+        FROM card 
+        LEFT JOIN card_deck ON card.id = card_deck.card_id
+        WHERE deck_id = ?
+        "#,
+        deck_id
+    )
+    .fetch_all(tx.acquire().await?)
+    .await?;
+
+    for card in cards {
+        println!(
+            "
+            {}: | {} | {} |
+            ",
+            card.id, card.front, card.back
+        );
+    }
+
+    Ok(())
+}
+
+pub async fn add_card_to_deck(
+    tx: &mut Transaction<'_, Sqlite>,
+    card_id: i64,
+    deck_id: i64,
+) -> Result<(), sqlx::Error> {
+    println!("Adding card with id {} to deck with id {}", card_id, deck_id);
+    sqlx::query!(
+        "INSERT INTO card_deck (card_id, deck_id) VALUES (?, ?)",
+        card_id,
+        deck_id
+    )
+    .execute(tx.acquire().await?)
+    .await?;
+
+    Ok(())
+}
+
 pub async fn update_card(
     tx: &mut Transaction<'_, Sqlite>,
     id: i64,
@@ -80,6 +123,41 @@ pub async fn create_deck(
     )
     .execute(tx.acquire().await?)
     .await?;
+
+    Ok(())
+}
+
+pub async fn update_deck(
+    tx: &mut Transaction<'_, Sqlite>,
+    id: i64,
+    name: String,
+    description: Option<String>,
+) -> Result<(), sqlx::Error> {
+    println!("Creating deck with name: {}", name);
+    sqlx::query!(
+        "UPDATE deck SET name = ?, description = ? WHERE id = ?",
+        name,
+        description,
+        id
+    )
+    .execute(tx.acquire().await?)
+    .await?;
+
+    Ok(())
+}
+
+pub async fn delete_deck(tx: &mut Transaction<'_, Sqlite>, id: i64) -> Result<(), sqlx::Error> {
+    println!("Deleting deck with id: {}", id);
+    let res = sqlx::query!("DELETE FROM deck WHERE id = ?", id)
+        .execute(tx.acquire().await?)
+        .await?
+        .rows_affected();
+
+    if res == 0 {
+        println!("No deck with id: {} found", id);
+    } else {
+        println!("Deleted deck with id: {}", id);
+    }
 
     Ok(())
 }

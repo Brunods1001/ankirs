@@ -1,10 +1,9 @@
-use super::MenuState;
 use super::traits::{MenuOptions, ProcessOption};
-use super::utils::{prompt_for_deck_details, prompt_for_deck_id, parse_input};
+use super::utils::{parse_input, prompt_for_deck_details, prompt_for_deck_id, prompt_for_card_id};
+use super::MenuState;
 use crate::app::state::AppState;
 use crate::queries::{
-    create_deck, list_decks, query_deck_exists,
-    query_deck_info
+    create_deck, delete_deck, list_decks, query_deck_exists, query_deck_info, update_deck, list_cards_for_deck, add_card_to_deck, list_cards,
 };
 use async_trait::async_trait;
 use sqlx::{Sqlite, Transaction};
@@ -16,14 +15,17 @@ use strum::{Display, EnumIter};
 pub enum DeckMenuOptions {
     Create,
     List,
-    // Update,
-    // Delete,
+    Update,
+    Delete,
     ChooseDeck,
 }
 
 #[derive(EnumIter, Display, Debug, PartialEq, Clone)]
 pub enum DeckDetailMenuOptions {
     View(i64),
+    ListAllCards(i64),
+    ListCards(i64),
+    AddCard(i64),
     GoBack(AppState),
     Quit,
 }
@@ -51,6 +53,19 @@ impl ProcessOption for DeckMenuOptions {
                 println!("Creating a deck");
                 let (name, description) = prompt_for_deck_details()?;
                 create_deck(tx, name, description).await?;
+            }
+            DeckMenuOptions::Update => {
+                println!("Updating a deck... insert an id");
+                let id = prompt_for_deck_id()?;
+                println!("Updating deck with id {}", id);
+                let (name, description) = prompt_for_deck_details()?;
+                update_deck(tx, id, name, description).await?;
+            }
+            DeckMenuOptions::Delete => {
+                println!("Deleting a deck... insert an id");
+                let id = prompt_for_deck_id()?;
+                println!("Deleting deck with id {}", id);
+                delete_deck(tx, id).await?;
             }
             DeckMenuOptions::List => {
                 println!("Listing all decks");
@@ -88,6 +103,22 @@ impl ProcessOption for DeckDetailMenuOptions {
                 println!("Viewing a deck with id {}", id);
                 let deck_info: String = query_deck_info(tx, id).await;
                 println!("Deck info: {deck_info}");
+                return Ok((MenuState::DeckDetailMenu(id), true));
+            }
+            DeckDetailMenuOptions::ListAllCards(id) => {
+                println!("Listing all cards");
+                list_cards(tx).await?;
+                return Ok((MenuState::DeckDetailMenu(id), true));
+            }
+            DeckDetailMenuOptions::ListCards(id) => {
+                println!("Listing cards for deck with id {}", id);
+                list_cards_for_deck(tx, id).await?;
+                return Ok((MenuState::DeckDetailMenu(id), true));
+            }
+            DeckDetailMenuOptions::AddCard(id) => {
+                println!("Adding a card to deck with id {}", id);
+                let card_id = prompt_for_card_id()?;
+                add_card_to_deck(tx, card_id, id).await?;
                 return Ok((MenuState::DeckDetailMenu(id), true));
             }
             DeckDetailMenuOptions::GoBack(mut state) => {
