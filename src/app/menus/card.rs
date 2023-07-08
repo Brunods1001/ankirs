@@ -9,7 +9,7 @@ use sqlx::{Sqlite, Transaction};
 
 use strum::{Display, EnumIter};
 
-#[derive(EnumIter, Display, Debug, PartialEq, Clone)]
+#[derive(EnumIter, Display, Debug, PartialEq)]
 pub enum CardMenuOptions {
     Create,
     List,

@@ -23,7 +23,7 @@ pub enum DeckMenuOptions {
     ChooseDeck,
 }
 
-#[derive(EnumIter, Display, Debug, PartialEq, Clone)]
+#[derive(EnumIter, Display, Debug, PartialEq)]
 pub enum DeckDetailMenuOptions {
     View(i64),
     ListAllCards(i64),
