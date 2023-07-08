@@ -48,7 +48,7 @@ pub async fn start_app(pool: SqlitePool) -> Result<(), sqlx::Error> {
 mod tests {
     #[tokio::test]
     async fn test_parse_input() {
-        use crate::app::menus::{utils::parse_input, CardMenuOptions};
+        use crate::app::menus::{utils::parse_input, card::CardMenuOptions};
         assert_eq!(
             parse_input::<CardMenuOptions>("1"),
             Some(CardMenuOptions::Create)
