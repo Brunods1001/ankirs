@@ -47,3 +47,10 @@ pub struct ListDeck {
     pub name: String,
     pub description: Option<String>,
 }
+
+#[derive(Debug)]
+pub struct Deck {
+    pub id: Option<i64>,
+    pub name: String,
+    pub description: Option<String>,
+}

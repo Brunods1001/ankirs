@@ -4,6 +4,7 @@ mod models;
 mod queries;
 
 use app::start_app;
+use app::start_app_mvu;
 
 use dotenv::dotenv;
 use sqlx::sqlite::SqlitePoolOptions;
@@ -20,6 +21,8 @@ struct Cli {
 enum Commands {
     /// shows menu and starts the app
     Start,
+    /// start an MVU architected start_app_mvu
+    MVU,
     /// oversees all cards in the app
     Card {
         #[command(subcommand)]
@@ -78,6 +81,10 @@ async fn main() -> Result<(), sqlx::Error> {
         Some(Commands::Start) => {
             println!("Starting app");
             start_app(pool).await?;
+        }
+        Some(Commands::MVU) => {
+            println!("Starting app");
+            start_app_mvu(pool).await?;
         }
         _ => println!("no command given"),
         // Some(Commands::Card { command }) => match command {

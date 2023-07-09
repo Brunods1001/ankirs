@@ -1,6 +1,6 @@
 use std::io;
 
-use crate::models::{Card, ListCard, ListDeck};
+use crate::models::{Card, ListCard, ListDeck, Deck};
 use sqlx::{Acquire, Sqlite, Transaction};
 
 use bcrypt::{hash, DEFAULT_COST};
@@ -142,6 +142,17 @@ pub async fn update_card(
     }
 
     Ok(())
+}
+
+pub async fn get_deck_by_name(
+    tx: &mut Transaction<'_, Sqlite>,
+    name: String,
+) -> Result<Option<Deck>, sqlx::Error> {
+    let deck = sqlx::query_as!(Deck, "SELECT id, name, description FROM deck WHERE name = ?", name)
+        .fetch_optional(tx.acquire().await?)
+        .await?;
+
+    Ok(deck)
 }
 
 pub async fn create_deck(
