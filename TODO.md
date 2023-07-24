@@ -34,6 +34,7 @@ I can have sessions where I drill a deck. The results get stored in the database
     - [ ] needs to compare given answer with correct answer
     - [ ] a modular solution that can use different algorithms
 
+- [ ] BONUS: Use as a library for a web app using Leptos
 - [ ] BONUS: Add TUI support for reports
 - [ ] BONUS: Create a Tauri app:
     - [ ] with a SvelteKit frontend

@@ -1,5 +1,7 @@
 mod auth;
 mod app;
+mod db;
+mod services;
 mod models;
 mod queries;
 

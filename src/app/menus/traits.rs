@@ -4,7 +4,7 @@ use super::utils::parse_input;
 use super::MenuState;
 
 use async_trait::async_trait;
-use sqlx::{Sqlite, Transaction};
+use sqlx::SqlitePool;
 use std::fmt::Display;
 use std::io::{self, Write};
 use strum::IntoEnumIterator;
@@ -37,7 +37,7 @@ pub trait MenuOptions: IntoEnumIterator + Display + Sized + PartialEq {
 pub trait DecisionMaker {
     async fn make_decision(
         self,
-        tx: &mut Transaction<'_, Sqlite>,
+        pool: &SqlitePool,
         state: &AppState,
     ) -> Result<(MenuState, bool), sqlx::Error>;
     // async fn make_decision<'a>(&'a self, tx: &mut Transaction<'_, Sqlite>) -> Result<(&'a Self, bool), sqlx::Error>;
@@ -47,7 +47,7 @@ pub trait DecisionMaker {
 pub trait ProcessOption {
     async fn process(
         self,
-        tx: &mut Transaction<'_, Sqlite>,
+        pool: &SqlitePool,
         state: &AppState,
     ) -> Result<(MenuState, bool), sqlx::Error>;
 }

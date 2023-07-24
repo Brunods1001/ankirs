@@ -9,7 +9,7 @@ use crate::queries::{
     list_decks, query_deck_exists, query_deck_info, review_deck, update_deck,
 };
 use async_trait::async_trait;
-use sqlx::{Sqlite, Transaction};
+use sqlx::SqlitePool;
 use std::io::{self, Write};
 
 use strum::{Display, EnumIter};
@@ -51,38 +51,38 @@ impl MenuOptions for DeckDetailMenuOptions {
 impl ProcessOption for DeckMenuOptions {
     async fn process(
         self,
-        tx: &mut Transaction<'_, Sqlite>,
+        pool: &SqlitePool,
         _state: &AppState,
     ) -> Result<(MenuState, bool), sqlx::Error> {
         match self {
             DeckMenuOptions::Create => {
                 println!("Creating a deck");
                 let (name, description) = prompt_for_deck_details()?;
-                create_deck(tx, name, description).await?;
+                create_deck(pool, name, description).await?;
             }
             DeckMenuOptions::Update => {
                 println!("Updating a deck... insert an id");
                 let id = prompt_for_deck_id()?;
                 println!("Updating deck with id {}", id);
                 let (name, description) = prompt_for_deck_details()?;
-                update_deck(tx, id, name, description).await?;
+                update_deck(pool, id, name, description).await?;
             }
             DeckMenuOptions::Delete => {
                 println!("Deleting a deck... insert an id");
                 let id = prompt_for_deck_id()?;
                 println!("Deleting deck with id {}", id);
-                delete_deck(tx, id).await?;
+                delete_deck(pool, id).await?;
             }
             DeckMenuOptions::List => {
                 println!("Listing all decks");
-                list_decks(tx).await?;
+                list_decks(pool).await?;
             }
             DeckMenuOptions::ChooseDeck => {
                 println!("Choosing a deck");
                 let id = prompt_for_deck_id()?;
                 println!("Chose deck with id {}", id);
                 // check if deck exists first
-                let does_exist: bool = query_deck_exists(tx, id).await?;
+                let does_exist: bool = query_deck_exists(pool, id).await?;
                 if !does_exist {
                     println!("Deck does not exist");
                 } else {
@@ -101,48 +101,48 @@ impl ProcessOption for DeckMenuOptions {
 impl ProcessOption for DeckDetailMenuOptions {
     async fn process(
         self,
-        tx: &mut Transaction<'_, Sqlite>,
+        pool: &SqlitePool,
         _state: &AppState,
     ) -> Result<(MenuState, bool), sqlx::Error> {
         println!("Making DeckDetailMenuOptions decision for {:?}", self);
         match self {
             DeckDetailMenuOptions::View(id) => {
                 println!("Viewing a deck with id {}", id);
-                let deck_info: String = query_deck_info(tx, id).await;
+                let deck_info: String = query_deck_info(pool, id).await;
                 println!("Deck info: {deck_info}");
                 return Ok((MenuState::DeckDetailMenu(id), true));
             }
             DeckDetailMenuOptions::ListAllCards(id) => {
                 println!("Listing all cards");
-                list_cards(tx).await?;
+                list_cards(pool).await?;
                 return Ok((MenuState::DeckDetailMenu(id), true));
             }
             DeckDetailMenuOptions::ListCards(id) => {
                 println!("Listing cards for deck with id {}", id);
-                list_cards_for_deck(tx, id).await?;
+                list_cards_for_deck(pool, id).await?;
                 return Ok((MenuState::DeckDetailMenu(id), true));
             }
             DeckDetailMenuOptions::AddCard(id) => {
                 println!("Adding a card to deck with id {}", id);
                 let card_id = prompt_for_card_id()?;
-                add_card_to_deck(tx, card_id, id).await?;
+                add_card_to_deck(pool, card_id, id).await?;
                 return Ok((MenuState::DeckDetailMenu(id), true));
             }
             DeckDetailMenuOptions::CreateCard(id) => {
                 println!("Creating a card for deck with id {}", id);
                 let (front, back) = prompt_for_card_details()?;
                 let card_id = create_card(
-                    tx,
+                    pool,
                     front.unwrap_or("".to_string()),
                     back.unwrap_or("".to_string()),
                 )
                 .await?;
-                add_card_to_deck(tx, card_id, id).await?;
+                add_card_to_deck(pool, card_id, id).await?;
                 return Ok((MenuState::DeckDetailMenu(id), true));
             }
             DeckDetailMenuOptions::Review(id) => {
                 println!("Reviewing a deck with id {}", id);
-                review_deck(tx, id).await?;
+                review_deck(pool, id).await?;
                 return Ok((MenuState::DeckDetailMenu(id), true));
             }
             DeckDetailMenuOptions::GoBack(mut state) => {

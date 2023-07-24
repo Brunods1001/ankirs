@@ -1,16 +1,17 @@
 use std::io;
 
-use crate::models::{Card, ListCard, ListDeck, Deck};
-use sqlx::{Acquire, Sqlite, Transaction};
+use crate::models::{Card, Deck, ListCard, ListDeck};
+use sqlx::{Acquire, SqlitePool};
 
 use bcrypt::{hash, DEFAULT_COST};
 
 pub async fn _create_user(
-    tx: &mut Transaction<'_, Sqlite>,
+    pool: &SqlitePool,
     username: String,
     password: String,
 ) -> Result<i64, sqlx::Error> {
     println!("Creating user with username: {}", username);
+    let mut tx = pool.begin().await?;
     let password_hash = hash(password, DEFAULT_COST).unwrap();
     let id = sqlx::query!(
         "INSERT INTO user (username, password_hash) VALUES (?, ?) RETURNING id;",
@@ -21,15 +22,18 @@ pub async fn _create_user(
     .await?
     .id;
 
+    tx.commit().await?;
+
     Ok(id)
 }
 
 pub async fn create_card(
-    tx: &mut Transaction<'_, Sqlite>,
+    pool: &SqlitePool,
     front: String,
     back: String,
 ) -> Result<i64, sqlx::Error> {
     println!("Creating card with front: {}, back: {}", front, back);
+    let mut tx = pool.begin().await?;
     let id = sqlx::query!(
         "INSERT INTO card (front, back) VALUES (?, ?) RETURNING id;",
         front,
@@ -38,11 +42,13 @@ pub async fn create_card(
     .fetch_one(tx.acquire().await?)
     .await?
     .id;
+    tx.commit().await?;
 
     Ok(id)
 }
 
-pub async fn list_cards(tx: &mut Transaction<'_, Sqlite>) -> Result<(), sqlx::Error> {
+pub async fn list_cards(pool: &SqlitePool) -> Result<(), sqlx::Error> {
+    let mut tx = pool.begin().await?;
     let cards = sqlx::query_as!(ListCard, "SELECT id, front, back FROM card")
         .fetch_all(tx.acquire().await?)
         .await?;
@@ -59,10 +65,8 @@ pub async fn list_cards(tx: &mut Transaction<'_, Sqlite>) -> Result<(), sqlx::Er
     Ok(())
 }
 
-pub async fn list_cards_for_deck(
-    tx: &mut Transaction<'_, Sqlite>,
-    deck_id: i64,
-) -> Result<(), sqlx::Error> {
+pub async fn list_cards_for_deck(pool: &SqlitePool, deck_id: i64) -> Result<(), sqlx::Error> {
+    let mut tx = pool.begin().await?;
     let cards = sqlx::query_as!(
         ListCard,
         r#"
@@ -89,10 +93,11 @@ pub async fn list_cards_for_deck(
 }
 
 pub async fn add_card_to_deck(
-    tx: &mut Transaction<'_, Sqlite>,
+    pool: &SqlitePool,
     card_id: i64,
     deck_id: i64,
 ) -> Result<(), sqlx::Error> {
+    let mut tx = pool.begin().await?;
     println!(
         "Adding card with id {} to deck with id {}",
         card_id, deck_id
@@ -109,11 +114,12 @@ pub async fn add_card_to_deck(
 }
 
 pub async fn update_card(
-    tx: &mut Transaction<'_, Sqlite>,
+    pool: &SqlitePool,
     id: i64,
     front: Option<String>,
     back: Option<String>,
 ) -> Result<(), sqlx::Error> {
+    let mut tx = pool.begin().await?;
     println!("Updating card with id: {}", id);
     match (front, back) {
         (Some(front), Some(back)) => {
@@ -145,21 +151,44 @@ pub async fn update_card(
 }
 
 pub async fn get_deck_by_name(
-    tx: &mut Transaction<'_, Sqlite>,
+    pool: &SqlitePool,
     name: String,
 ) -> Result<Option<Deck>, sqlx::Error> {
-    let deck = sqlx::query_as!(Deck, "SELECT id, name, description FROM deck WHERE name = ?", name)
-        .fetch_optional(tx.acquire().await?)
-        .await?;
+    let mut tx = pool.begin().await?;
+    let deck = sqlx::query_as!(
+        Deck,
+        "SELECT id, name, description FROM deck WHERE name = ?",
+        name
+    )
+    .fetch_optional(tx.acquire().await?)
+    .await?;
 
     Ok(deck)
 }
 
+pub async fn delete_deck_by_name(pool: &SqlitePool, name: String) -> Result<(), sqlx::Error> {
+    let mut tx = pool.begin().await?;
+    println!("Deleting deck with name: {}", name);
+    let res = sqlx::query!("DELETE FROM deck WHERE name = ?", name)
+        .execute(tx.acquire().await?)
+        .await?
+        .rows_affected();
+
+    tx.commit().await?;
+
+    if res == 0 {
+        println!("No deck with name {} found", name);
+    }
+
+    Ok(())
+}
+
 pub async fn create_deck(
-    tx: &mut Transaction<'_, Sqlite>,
+    pool: &SqlitePool,
     name: String,
     description: Option<String>,
 ) -> Result<(), sqlx::Error> {
+    let mut tx = pool.begin().await?;
     println!("Creating deck with name: {}", name);
     sqlx::query!(
         "INSERT INTO deck (name, description) VALUES (?, ?)",
@@ -173,11 +202,12 @@ pub async fn create_deck(
 }
 
 pub async fn update_deck(
-    tx: &mut Transaction<'_, Sqlite>,
+    pool: &SqlitePool,
     id: i64,
     name: String,
     description: Option<String>,
 ) -> Result<(), sqlx::Error> {
+    let mut tx = pool.begin().await?;
     println!("Creating deck with name: {}", name);
     sqlx::query!(
         "UPDATE deck SET name = ?, description = ? WHERE id = ?",
@@ -191,7 +221,8 @@ pub async fn update_deck(
     Ok(())
 }
 
-pub async fn delete_deck(tx: &mut Transaction<'_, Sqlite>, id: i64) -> Result<(), sqlx::Error> {
+pub async fn delete_deck(pool: &SqlitePool, id: i64) -> Result<(), sqlx::Error> {
+    let mut tx = pool.begin().await?;
     println!("Deleting deck with id: {}", id);
     let res = sqlx::query!("DELETE FROM deck WHERE id = ?", id)
         .execute(tx.acquire().await?)
@@ -207,7 +238,8 @@ pub async fn delete_deck(tx: &mut Transaction<'_, Sqlite>, id: i64) -> Result<()
     Ok(())
 }
 
-pub async fn list_decks(tx: &mut Transaction<'_, Sqlite>) -> Result<(), sqlx::Error> {
+pub async fn list_decks(pool: &SqlitePool) -> Result<(), sqlx::Error> {
+    let mut tx = pool.begin().await?;
     let decks = sqlx::query_as!(ListDeck, "SELECT id, name, description FROM deck")
         .fetch_all(tx.acquire().await?)
         .await?;
@@ -226,7 +258,8 @@ pub async fn list_decks(tx: &mut Transaction<'_, Sqlite>) -> Result<(), sqlx::Er
     Ok(())
 }
 
-pub async fn delete_card(tx: &mut Transaction<'_, Sqlite>, id: i64) -> Result<(), sqlx::Error> {
+pub async fn delete_card(pool: &SqlitePool, id: i64) -> Result<(), sqlx::Error> {
+    let mut tx = pool.begin().await?;
     println!("Deleting card with id: {}", id);
     let res = sqlx::query!("DELETE FROM card WHERE id = ?", id)
         .execute(tx.acquire().await?)
@@ -242,10 +275,8 @@ pub async fn delete_card(tx: &mut Transaction<'_, Sqlite>, id: i64) -> Result<()
     Ok(())
 }
 
-pub async fn query_deck_exists(
-    tx: &mut Transaction<'_, Sqlite>,
-    id: i64,
-) -> Result<bool, sqlx::Error> {
+pub async fn query_deck_exists(pool: &SqlitePool, id: i64) -> Result<bool, sqlx::Error> {
+    let mut tx = pool.begin().await?;
     let res = sqlx::query!("SELECT id FROM deck WHERE id = ?", id)
         .fetch_optional(tx.acquire().await?)
         .await?;
@@ -254,7 +285,8 @@ pub async fn query_deck_exists(
     Ok(res.is_some())
 }
 
-pub async fn query_deck_info(tx: &mut Transaction<'_, Sqlite>, id: i64) -> String {
+pub async fn query_deck_info(pool: &SqlitePool, id: i64) -> String {
+    let mut tx = pool.begin().await.unwrap();
     let res = sqlx::query!("SELECT * FROM deck WHERE id = ?", id)
         .fetch_one(tx.acquire().await.unwrap())
         .await
@@ -265,8 +297,8 @@ pub async fn query_deck_info(tx: &mut Transaction<'_, Sqlite>, id: i64) -> Strin
     format!("{id}, {name}, {desc}").to_string()
 }
 
-pub async fn review_deck(tx: &mut Transaction<'_, Sqlite>, id: i64) -> Result<(), sqlx::Error> {
-    // TODO: add limit
+pub async fn review_deck(pool: &SqlitePool, id: i64) -> Result<(), sqlx::Error> {
+    let mut tx = pool.begin().await.expect("Error starting transaction");
     let mut cards = sqlx::query_as!(
         Card,
         r#"
@@ -286,6 +318,14 @@ pub async fn review_deck(tx: &mut Transaction<'_, Sqlite>, id: i64) -> Result<()
     let mut correct = 0;
     let mut incorrect = 0;
 
+    let mut tx_session = pool.begin().await.expect("Error starting transaction");
+    // create a session
+    let session_id = sqlx::query!("INSERT INTO session DEFAULT VALUES RETURNING id")
+        .fetch_one(tx_session.acquire().await.unwrap())
+        .await?
+        .id;
+    tx_session.commit().await?;
+    let tx_session = pool.begin().await.expect("Error starting transaction");
     while !cards.is_empty() {
         let card = cards.pop().unwrap();
         println!("Front: {}", card.front);
@@ -295,20 +335,84 @@ pub async fn review_deck(tx: &mut Transaction<'_, Sqlite>, id: i64) -> Result<()
             .read_line(&mut input)
             .expect("Failed to read line");
 
-        // TODO: add similarity function
-        if input.trim() == card.back {
+        let answer = input.trim();
+        // save answer
+        let mut tx = pool.begin().await.expect("Error starting transaction");
+        sqlx::query!(
+            "INSERT INTO answer (session_id, card_id, answer, deck_id, correct_answer) VALUES (?, ?, ?, ?, ?);",
+            session_id,
+            card.id,
+            answer,
+            id,
+            card.back,
+        )
+        .execute(tx.acquire().await?)
+        .await?;
+        tx.commit().await?;
+
+        if answer == card.back {
             println!("Correct!");
             correct += 1;
         } else {
             println!("Incorrect!");
+            println!("The answer is: {}", card.back);
             incorrect += 1;
             cards.push(card);
         }
     }
 
+    tx_session.commit().await?;
     println!("You got {} correct and {} incorrect", correct, incorrect);
 
     Ok(())
+}
+
+pub async fn prompt_for_card_id_given_deck(
+    pool: &SqlitePool,
+    deck_id: i64,
+) -> Result<(), sqlx::Error> {
+    let mut tx = pool.begin().await?;
+    let cards = sqlx::query_as!(
+        Card,
+        r#"
+        SELECT id, front, back 
+        FROM card 
+        WHERE id IN (
+            SELECT card_id 
+            FROM card_deck 
+            WHERE deck_id = ?)
+        ORDER BY RANDOM();
+        "#,
+        deck_id
+    )
+    .fetch_all(tx.acquire().await?)
+    .await?;
+
+    // print cards and ask the user to choose
+    for card in cards {
+        println!("{}: {}", card.id.unwrap(), card.front);
+    }
+
+    println!("Choose a card id: ");
+
+    Ok(())
+}
+
+pub async fn query_card_by_id(pool: &SqlitePool, id: i64) -> Result<Card, sqlx::Error> {
+    let mut tx = pool.begin().await?;
+    let card = sqlx::query_as!(
+        Card,
+        r#"
+        SELECT id, front, back 
+        FROM card 
+        WHERE id = ?;
+        "#,
+        id
+    )
+    .fetch_one(tx.acquire().await?)
+    .await?;
+
+    Ok(card)
 }
 
 #[cfg(test)]
@@ -316,22 +420,21 @@ mod tests {
     use super::*;
     use dotenv::dotenv;
 
-    async fn create_transaction() -> Transaction<'static, Sqlite> {
+    async fn create_transaction() -> SqlitePool {
         dotenv().ok();
         let database_url = dotenv::var("DATABASE_URL").expect("DATABASE_URL must be set");
-        let conn = sqlx::sqlite::SqlitePoolOptions::new()
-            .connect(&database_url)
+        let pool = SqlitePool::connect(&database_url)
             .await
-            .unwrap();
-
-        conn.begin().await.unwrap()
+            .expect("Failed to create pool");
+        pool
     }
 
     #[tokio::test]
     async fn test_create_card() {
-        let mut tx = create_transaction().await;
+        let pool = create_transaction().await;
+        let mut tx = pool.begin().await.unwrap();
 
-        create_card(&mut tx, "front".to_string(), "back".to_string())
+        create_card(&pool, "front".to_string(), "back".to_string())
             .await
             .unwrap();
 
@@ -348,7 +451,8 @@ mod tests {
 
     #[tokio::test]
     async fn test_update_card() {
-        let mut tx = create_transaction().await;
+        let pool = create_transaction().await;
+        let mut tx = pool.begin().await.unwrap();
 
         let record_id = sqlx::query!(
             "INSERT INTO card (front, back) VALUES (?, ?) RETURNING id",
@@ -360,7 +464,7 @@ mod tests {
         .unwrap()
         .id;
 
-        update_card(&mut tx, record_id, Some("new front".to_string()), None)
+        update_card(&pool, record_id, Some("new front".to_string()), None)
             .await
             .unwrap();
 
@@ -377,7 +481,8 @@ mod tests {
 
     #[tokio::test]
     async fn test_delete_card() {
-        let mut tx = create_transaction().await;
+        let pool = create_transaction().await;
+        let mut tx = pool.begin().await.unwrap();
 
         sqlx::query!(
             "INSERT INTO card (front, back) VALUES (?, ?)",
@@ -388,7 +493,7 @@ mod tests {
         .await
         .unwrap();
 
-        delete_card(&mut tx, 1).await.unwrap();
+        delete_card(&pool, 1).await.unwrap();
 
         let card = sqlx::query!("SELECT front, back FROM card WHERE id = 1;")
             .fetch_optional(tx.acquire().await.unwrap())
@@ -402,7 +507,8 @@ mod tests {
 
     #[tokio::test]
     async fn test_list_cards() {
-        let mut tx = create_transaction().await;
+        let pool = create_transaction().await;
+        let mut tx = pool.begin().await.unwrap();
 
         sqlx::query!(
             "INSERT INTO card (front, back) VALUES (?, ?)",
@@ -422,16 +528,17 @@ mod tests {
         .await
         .unwrap();
 
-        list_cards(&mut tx).await.unwrap();
+        list_cards(&pool).await.unwrap();
 
         tx.rollback().await.unwrap();
     }
 
     #[tokio::test]
     async fn test_create_deck() {
-        let mut tx = create_transaction().await;
+        let pool = create_transaction().await;
+        let mut tx = pool.begin().await.unwrap();
 
-        create_deck(&mut tx, "deck".to_string(), Some("description".to_string()))
+        create_deck(&pool, "deck".to_string(), Some("description".to_string()))
             .await
             .unwrap();
 
@@ -449,7 +556,8 @@ mod tests {
 
     #[tokio::test]
     async fn test_list_decks() {
-        let mut tx = create_transaction().await;
+        let pool = create_transaction().await;
+        let mut tx = pool.begin().await.unwrap();
 
         sqlx::query!(
             "INSERT INTO deck (name, description) VALUES (?, ?)",
@@ -469,20 +577,21 @@ mod tests {
         .await
         .unwrap();
 
-        list_decks(&mut tx).await.unwrap();
+        list_decks(&pool).await.unwrap();
 
         tx.rollback().await.unwrap();
     }
 
     #[tokio::test]
     async fn test_unique_deck_names() {
-        let mut tx = create_transaction().await;
+        let pool = create_transaction().await;
+        let mut tx = pool.begin().await.unwrap();
 
-        create_deck(&mut tx, "deck".to_string(), Some("description".to_string()))
+        create_deck(&pool, "deck".to_string(), Some("description".to_string()))
             .await
             .unwrap();
 
-        let res = create_deck(&mut tx, "deck".to_string(), Some("description".to_string())).await;
+        let res = create_deck(&pool, "deck".to_string(), Some("description".to_string())).await;
 
         assert_eq!(res.is_err(), true);
 

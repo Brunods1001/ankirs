@@ -30,10 +30,17 @@ impl User {
     }
 }
 
+#[derive(Debug)]
 pub struct Card {
     pub id: Option<i64>,
     pub front: String,
     pub back: String,
+}
+impl Card {
+    pub fn view(&self) {
+        // print card details
+        println!("{:?}", self);
+    }
 }
 
 pub struct ListCard {
@@ -53,4 +60,10 @@ pub struct Deck {
     pub id: Option<i64>,
     pub name: String,
     pub description: Option<String>,
+}
+
+impl Deck {
+    pub fn get_id(&self) -> i64 {
+        self.id.unwrap()
+    }
 }

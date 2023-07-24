@@ -1,11 +1,11 @@
 use super::traits::{MenuOptions, ProcessOption};
-use super::MenuState;
 use super::utils::{prompt_for_card_details, prompt_for_card_id};
+use super::MenuState;
 
 use crate::app::state::AppState;
 use crate::queries::{create_card, delete_card, list_cards, update_card};
 use async_trait::async_trait;
-use sqlx::{Sqlite, Transaction};
+use sqlx::SqlitePool;
 
 use strum::{Display, EnumIter};
 
@@ -35,7 +35,7 @@ impl MenuOptions for CardSubMenuOptions {}
 impl ProcessOption for CardMenuOptions {
     async fn process(
         self,
-        tx: &mut Transaction<'_, Sqlite>,
+        pool: &SqlitePool,
         _state: &AppState,
     ) -> Result<(MenuState, bool), sqlx::Error> {
         match self {
@@ -44,7 +44,7 @@ impl ProcessOption for CardMenuOptions {
                 let (front, back) = prompt_for_card_details()?;
 
                 create_card(
-                    tx,
+                    pool,
                     front.unwrap_or("".to_string()),
                     back.unwrap_or("".to_string()),
                 )
@@ -52,18 +52,18 @@ impl ProcessOption for CardMenuOptions {
             }
             CardMenuOptions::List => {
                 println!("Listing all cards");
-                list_cards(tx).await?;
+                list_cards(pool).await?;
             }
             CardMenuOptions::Update => {
                 println!("Updating a card");
                 let id = prompt_for_card_id()?;
                 let (front, back) = prompt_for_card_details()?;
-                update_card(tx, id, front, back).await?;
+                update_card(pool, id, front, back).await?;
             }
             CardMenuOptions::Delete => {
                 println!("Deleting a card");
                 let id = prompt_for_card_id()?;
-                delete_card(tx, id).await?;
+                delete_card(pool, id).await?;
             }
             CardMenuOptions::GoToMainMenu => {
                 println!("Going to main menu");
@@ -92,7 +92,7 @@ impl ProcessOption for CardMenuOptions {
 impl ProcessOption for CardSubMenuOptions {
     async fn process(
         self,
-        tx: &mut Transaction<'_, Sqlite>,
+        pool: &SqlitePool,
         _state: &AppState,
     ) -> Result<(MenuState, bool), sqlx::Error> {
         match self {
@@ -100,13 +100,13 @@ impl ProcessOption for CardSubMenuOptions {
                 println!("Updating the front of a card");
                 let id = prompt_for_card_id()?;
                 let front = "test".to_string();
-                update_card(tx, id, Some(front), None).await?;
+                update_card(pool, id, Some(front), None).await?;
             }
             CardSubMenuOptions::Back => {
                 println!("Updating the back of a card");
                 let id = prompt_for_card_id()?;
                 let back = "test".to_string();
-                update_card(tx, id, None, Some(back)).await?;
+                update_card(pool, id, None, Some(back)).await?;
             }
             CardSubMenuOptions::GoToCardMenu => {
                 println!("Going to card menu");
