@@ -144,6 +144,10 @@ impl Menu {
                     action: || Msg::Deck(MsgDeck::Review),
                 },
                 MenuOption {
+                    name: "Report".to_string(),
+                    action: || Msg::Deck(MsgDeck::Report),
+                },
+                MenuOption {
                     name: "Back".to_string(),
                     action: || Msg::Back,
                 },
@@ -195,6 +199,7 @@ enum MsgDeck {
     ViewCard,
     AddCard,
     Review,
+    Report,
     CreateCard,
 }
 
@@ -247,176 +252,191 @@ impl Model {
                 println!("Quitting");
                 Err("Quit".to_string())
             }
-            Msg::Deck(msg) => {
-                match msg {
-                    MsgDeck::Create => {
-                        println!("Creating deck");
-                        let (name, description) = prompt_for_deck_details().unwrap();
-                        let tx = pool.begin().await.expect("Error starting transaction");
-                        create_deck(&pool, name, description)
-                            .await
-                            .expect("Error creating deck");
-                        tx.commit().await.expect("Error committing transaction");
-                        Ok(())
-                    }
-                    MsgDeck::Update => {
-                        let tx = pool.begin().await.expect("Error starting transaction");
-                        let (name, description) = prompt_for_deck_details().unwrap();
-                        let id = self.deck.as_ref().expect("No deck set").id.unwrap();
-                        update_deck(&pool, id, name.clone(), description)
-                            .await
-                            .expect("Error updating deck");
-                        println!("Committing transaction");
-                        tx.commit().await.expect("Error committing transaction");
+            Msg::Deck(msg) => handle_deck_msg(self, pool, msg).await,
+        }
+    }
+}
 
-                        let menu = Menu::DeckDetail(name);
-                        println!("Navigating to {:?}", menu);
-                        if let Some(last_menu) = self.navigation_stack.last() {
-                            if *last_menu != menu {
-                                self.navigation_stack.push(menu.clone());
-                                self.current_menu = menu;
-                            }
-                        };
-                        Ok(())
-                    }
-                    MsgDeck::View => {
-                        println!("Which deck would you like to view?");
-                        let mut input = String::new();
-                        io::stdin().read_line(&mut input).unwrap();
-                        let input = input.trim().to_string();
-                        let tx = pool.begin().await.expect("Error starting transaction");
-                        let deck = get_deck_by_name(&pool, input.clone())
-                            .await
-                            .expect("Error getting deck");
-                        println!("Deck: {:?}", deck);
-                        tx.commit().await.expect("Error committing transaction");
+async fn handle_deck_msg(model: &mut Model, pool: &SqlitePool, msg: MsgDeck) -> Result<(), String> {
+    match msg {
+        MsgDeck::Create => {
+            println!("Creating deck");
+            let (name, description) = prompt_for_deck_details().unwrap();
+            create_deck(&pool, name, description)
+                .await
+                .expect("Error creating deck");
+            Ok(())
+        }
+        MsgDeck::Update => {
+            let tx = pool.begin().await.expect("Error starting transaction");
+            let (name, description) = prompt_for_deck_details().unwrap();
+            let id = model.deck.as_ref().expect("No deck set").id.unwrap();
+            update_deck(&pool, id, name.clone(), description)
+                .await
+                .expect("Error updating deck");
+            println!("Committing transaction");
+            tx.commit().await.expect("Error committing transaction");
 
-                        let menu = Menu::DeckDetail(input);
-                        println!("Navigating to {:?}", menu);
-                        self.navigation_stack.push(menu.clone());
-                        self.current_menu = menu.clone();
-
-                        // set deck state
-                        self.deck = deck;
-
-                        Ok(())
-                    }
-                    MsgDeck::Delete => {
-                        let tx = pool.begin().await.expect("Error starting transaction");
-                        delete_deck_by_name(
-                            &pool,
-                            self.deck.as_ref().expect("No deck found").name.clone(),
-                        )
-                        .await
-                        .expect("Error deleting deck");
-                        tx.commit().await.expect("Error committing transaction");
-
-                        // redirect to previous menu
-                        let menu = Menu::Deck;
-                        self.current_menu = menu;
-
-                        Ok(())
-                    }
-                    MsgDeck::List => {
-                        let tx = pool.begin().await.expect("Error starting transaction");
-                        list_decks(&pool).await.expect("Error listing decks");
-                        tx.commit().await.expect("Error committing transaction");
-                        Ok(())
-                    }
-                    MsgDeck::ListCards => {
-                        if let Some(deck) = &self.deck {
-                            println!("Listing cards for deck {}", deck.name);
-                            let res = DeckService::new(pool)
-                                .list_cards(deck.get_id())
-                                .await
-                                .expect("Error listing cards");
-                            Ok(res)
-                        } else {
-                            Err("No deck set".to_string())
-                        }
-                    }
-                    MsgDeck::ViewCard => {
-                        // prompt the user to choose a card from the list
-                        // this query needs to use cards associated with the deck
-                        if let Some(deck_id) = self.deck.as_ref().expect("No deck set").id {
-                            let card_id = DeckService::new(pool)
-                                .prompt_for_card(deck_id)
-                                .await
-                                .expect("Error prompting for card");
-                            CardService::new(pool)
-                                .view(card_id)
-                                .await
-                                .expect("Error prompting for card");
-                            Ok(())
-                        } else {
-                            Err("No deck set".to_string())
-                        }
-                    }
-                    MsgDeck::AddCard => {
-                        // get deck
-                        let deck = self.deck.as_ref().expect("No deck set");
-                        if let Some(deck_id) = deck.id {
-                            let tx = pool.begin().await.expect("Error starting transaction");
-                            let card_id = prompt_for_card_id().expect("Invalid input");
-                            add_card_to_deck(&pool, card_id, deck_id)
-                                .await
-                                .expect("Failed to add card to deck");
-                            tx.commit().await.expect("Error committing transaction");
-                        }
-                        Ok(())
-                    }
-                    MsgDeck::CreateCard => {
-                        // get deck
-                        let deck = self.deck.as_ref().expect("No deck set");
-                        if let Some(deck_id) = deck.id {
-                            let tx = pool.begin().await.expect("Error starting transaction");
-                            let (front, back) = prompt_for_card_details().expect("Invalid input");
-                            match create_card(
-                                &pool,
-                                front.unwrap_or("".to_string()),
-                                back.unwrap_or("".to_string()),
-                            )
-                            .await
-                            {
-                                Ok(card_id) => {
-                                    println!("Created card with id {card_id}");
-                                    match add_card_to_deck(&pool, card_id, deck_id).await {
-                                        Ok(()) => println!("Added card to deck"),
-                                        Err(e) => println!("Error: {}", e),
-                                    }
-                                }
-                                Err(e) => println!("Error: {}", e),
-                            };
-                            tx.commit().await.expect("Error committing transaction");
-                        }
-                        Ok(())
-                    }
-                    MsgDeck::Review => {
-                        // reviews the cards in a deck
-                        let deck = self.deck.as_ref().expect("No deck set");
-                        if let Some(deck_id) = deck.id {
-                            DeckService::new(pool)
-                                .review(deck_id)
-                                .await
-                                .expect("Error reviewing deck");
-
-                            println!("Try again?");
-                            let mut input = String::new();
-                            io::stdin()
-                                .read_line(&mut input)
-                                .expect("Failed to read line");
-                            if input.trim() == "y" {
-                                println!("Try again");
-                                Ok(())
-                            } else {
-                                println!("Done");
-                                Ok(())
-                            }
-                        } else {
-                            Err("No deck set".to_string())
-                        }
-                    }
+            let menu = Menu::DeckDetail(name);
+            println!("Navigating to {:?}", menu);
+            if let Some(last_menu) = model.navigation_stack.last() {
+                if *last_menu != menu {
+                    model.navigation_stack.push(menu.clone());
+                    model.current_menu = menu;
                 }
+            };
+            Ok(())
+        }
+        MsgDeck::View => {
+            println!("Which deck would you like to view?");
+            let mut input = String::new();
+            io::stdin().read_line(&mut input).unwrap();
+            let input = input.trim().to_string();
+            let tx = pool.begin().await.expect("Error starting transaction");
+            let deck = get_deck_by_name(&pool, input.clone())
+                .await
+                .expect("Error getting deck")
+                .expect("No deck found");
+            println!("Deck: {:?}", deck);
+            tx.commit().await.expect("Error committing transaction");
+
+            let menu = Menu::DeckDetail(input);
+            println!("Navigating to {:?}", menu);
+            model.navigation_stack.push(menu.clone());
+            model.current_menu = menu.clone();
+
+            // set deck state
+            println!("Setting model deck to {}", deck.name);
+            model.deck = Some(deck);
+
+            Ok(())
+        }
+        MsgDeck::Delete => {
+            let tx = pool.begin().await.expect("Error starting transaction");
+            delete_deck_by_name(
+                &pool,
+                model.deck.as_ref().expect("No deck found").name.clone(),
+            )
+            .await
+            .expect("Error deleting deck");
+            tx.commit().await.expect("Error committing transaction");
+
+            // redirect to previous menu
+            let menu = Menu::Deck;
+            model.current_menu = menu;
+
+            Ok(())
+        }
+        MsgDeck::List => {
+            let tx = pool.begin().await.expect("Error starting transaction");
+            list_decks(&pool).await.expect("Error listing decks");
+            tx.commit().await.expect("Error committing transaction");
+            Ok(())
+        }
+        MsgDeck::ListCards => {
+            if let Some(deck) = &model.deck {
+                println!("Listing cards for deck {}", deck.name);
+                let res = DeckService::new(pool)
+                    .list_cards(&deck.get_id())
+                    .await
+                    .expect("Error listing cards");
+                Ok(res)
+            } else {
+                Err("No deck set".to_string())
+            }
+        }
+        MsgDeck::ViewCard => {
+            // prompt the user to choose a card from the list
+            // this query needs to use cards associated with the deck
+            if let Some(deck_id) = model.deck.as_ref().expect("No deck set").id {
+                let card_id = DeckService::new(pool)
+                    .prompt_for_card(deck_id)
+                    .await
+                    .expect("Error prompting for card");
+                CardService::new(pool)
+                    .view(card_id)
+                    .await
+                    .expect("Error prompting for card");
+                Ok(())
+            } else {
+                Err("No deck set".to_string())
+            }
+        }
+        MsgDeck::AddCard => {
+            // get deck
+            let deck = model.deck.as_ref().expect("No deck set");
+            if let Some(deck_id) = deck.id {
+                let tx = pool.begin().await.expect("Error starting transaction");
+                let card_id = prompt_for_card_id().expect("Invalid input");
+                add_card_to_deck(&pool, card_id, deck_id)
+                    .await
+                    .expect("Failed to add card to deck");
+                tx.commit().await.expect("Error committing transaction");
+            }
+            Ok(())
+        }
+        MsgDeck::CreateCard => {
+            // get deck
+            let deck = model.deck.as_ref().expect("No deck set");
+            if let Some(deck_id) = deck.id {
+                let tx = pool.begin().await.expect("Error starting transaction");
+                let (front, back) = prompt_for_card_details().expect("Invalid input");
+                match create_card(
+                    &pool,
+                    front.unwrap_or("".to_string()),
+                    back.unwrap_or("".to_string()),
+                )
+                .await
+                {
+                    Ok(card_id) => {
+                        println!("Created card with id {card_id}");
+                        match add_card_to_deck(&pool, card_id, deck_id).await {
+                            Ok(()) => println!("Added card to deck"),
+                            Err(e) => println!("Error: {}", e),
+                        }
+                    }
+                    Err(e) => println!("Error: {}", e),
+                };
+                tx.commit().await.expect("Error committing transaction");
+            }
+            Ok(())
+        }
+        MsgDeck::Review => {
+            // reviews the cards in a deck
+            let deck = model.deck.as_ref().expect("No deck set");
+            if let Some(deck_id) = deck.id {
+                DeckService::new(pool)
+                    .review(deck_id)
+                    .await
+                    .expect("Error reviewing deck");
+
+                println!("Try again?");
+                let mut input = String::new();
+                io::stdin()
+                    .read_line(&mut input)
+                    .expect("Failed to read line");
+                if input.trim() == "y" {
+                    println!("Try again");
+                    Ok(())
+                } else {
+                    println!("Done");
+                    Ok(())
+                }
+            } else {
+                Err("No deck set".to_string())
+            }
+        }
+        MsgDeck::Report => {
+            // view the report for a deck
+            let deck = model.deck.as_ref().expect("No deck set");
+            if let Some(deck_id) = deck.id {
+                DeckService::new(pool)
+                    .view_report(deck_id)
+                    .await
+                    .expect("Error viewing report");
+                Ok(())
+            } else {
+                Err("No deck set".to_string())
             }
         }
     }

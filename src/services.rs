@@ -49,7 +49,7 @@ impl<'a> DeckService<'a> {
     pub fn new(pool: &'a SqlitePool) -> Self {
         DeckService { pool }
     }
-    pub async fn list_cards(&self, deck_id: i64) -> Result<(), sqlx::Error> {
+    pub async fn list_cards(&self, deck_id: &i64) -> Result<(), sqlx::Error> {
         list_cards_for_deck(self.pool, deck_id)
             .await
             .expect("Error listing cards for deck");
@@ -59,7 +59,7 @@ impl<'a> DeckService<'a> {
     pub async fn prompt_for_card(&self, deck_id: i64) -> Result<i64, sqlx::Error> {
         println!("Choose a card");
         let mut card_id = String::new();
-        list_cards_for_deck(self.pool, deck_id)
+        list_cards_for_deck(self.pool, &deck_id)
             .await
             .expect("Error listing cards for deck");
         // get card id from user
@@ -74,5 +74,29 @@ impl<'a> DeckService<'a> {
     pub async fn review(&self, deck_id: i64) -> Result<(), sqlx::Error> {
         let res = review_deck(self.pool, deck_id).await;
         res
+    }
+
+    pub async fn view_report(&self, deck_id: i64) -> Result<(), sqlx::Error> {
+        println!("Viewing deck with id {}", deck_id);
+        // get sessions and answers related to deck
+        let res = sqlx::query!(
+            r#"
+            SELECT
+                a.deck_id,
+                a.id AS answer_id,
+                a.card_id,
+                a.session_id,
+                a.correct_answer,
+                a.time AS answer_time
+            FROM answer a
+            LEFT JOIN session s ON a.session_id = s.id
+            WHERE a.deck_id = ?
+            "#,
+            deck_id
+        );   
+        for row in res.fetch_all(self.pool).await? {
+            println!("Answer: {:?}", row);
+        }
+        Ok(())
     }
 }

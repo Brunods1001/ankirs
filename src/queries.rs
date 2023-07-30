@@ -65,7 +65,7 @@ pub async fn list_cards(pool: &SqlitePool) -> Result<(), sqlx::Error> {
     Ok(())
 }
 
-pub async fn list_cards_for_deck(pool: &SqlitePool, deck_id: i64) -> Result<(), sqlx::Error> {
+pub async fn list_cards_for_deck(pool: &SqlitePool, deck_id: &i64) -> Result<(), sqlx::Error> {
     let mut tx = pool.begin().await?;
     let cards = sqlx::query_as!(
         ListCard,
@@ -110,6 +110,7 @@ pub async fn add_card_to_deck(
     .execute(tx.acquire().await?)
     .await?;
 
+    tx.commit().await?;
     Ok(())
 }
 
@@ -197,6 +198,8 @@ pub async fn create_deck(
     )
     .execute(tx.acquire().await?)
     .await?;
+
+    tx.commit().await?;
 
     Ok(())
 }
@@ -297,24 +300,32 @@ pub async fn query_deck_info(pool: &SqlitePool, id: i64) -> String {
     format!("{id}, {name}, {desc}").to_string()
 }
 
-pub async fn review_deck(pool: &SqlitePool, id: i64) -> Result<(), sqlx::Error> {
+pub async fn get_cards_ordered_by_score(pool: &SqlitePool, id: i64) -> Result<Vec<Card>, sqlx::Error> {
     let mut tx = pool.begin().await.expect("Error starting transaction");
-    let mut cards = sqlx::query_as!(
+    let cards = sqlx::query_as!(
         Card,
         r#"
-        SELECT id, front, back 
-        FROM card 
-        WHERE id IN (
-            SELECT card_id 
-            FROM card_deck 
-            WHERE deck_id = ?)
-        ORDER BY RANDOM();
+SELECT card.id, front, back
+FROM card 
+LEFT JOIN answer ON card.id = answer.card_id
+LEFT JOIN self_assessment ON answer.id = self_assessment.answer_id
+WHERE card.id IN (
+    SELECT card_id 
+    FROM card_deck 
+    WHERE deck_id = ?)
+GROUP BY card.id
+ORDER BY AVG(self_assessment.score) DESC NULLS LAST,
+    COUNT(self_assessment.score) DESC NULLS LAST;
         "#,
         id
     )
     .fetch_all(tx.acquire().await?)
     .await?;
 
+    Ok(cards)
+}
+pub async fn review_deck(pool: &SqlitePool, id: i64) -> Result<(), sqlx::Error> {
+    let mut cards = get_cards_ordered_by_score(pool, id).await?;
     let mut correct = 0;
     let mut incorrect = 0;
 
@@ -336,18 +347,54 @@ pub async fn review_deck(pool: &SqlitePool, id: i64) -> Result<(), sqlx::Error> 
             .expect("Failed to read line");
 
         let answer = input.trim();
+
+        // if ctrl-c is pressed, exis
+        if answer == "EXIT" {
+            break;
+        }
+
         // save answer
         let mut tx = pool.begin().await.expect("Error starting transaction");
-        sqlx::query!(
-            "INSERT INTO answer (session_id, card_id, answer, deck_id, correct_answer) VALUES (?, ?, ?, ?, ?);",
+        let answer_id = sqlx::query!(
+            "INSERT INTO answer (session_id, card_id, answer, deck_id, correct_answer) VALUES (?, ?, ?, ?, ?) 
+            RETURNING id;",
             session_id,
             card.id,
             answer,
             id,
             card.back,
         )
-        .execute(tx.acquire().await?)
-        .await?;
+        .fetch_one(tx.acquire().await?)
+        .await?
+        .id;
+
+        println!("The answer is: {}", &card.back);
+
+        loop {
+            println!("How did you do on a scale of 0 to 100?");
+            let mut input = String::new();
+            io::stdin()
+                .read_line(&mut input)
+                .expect("Failed to read line");
+            if let Ok(num) = input.trim().parse::<i32>() {
+                let rows_affected = sqlx::query!(
+                    "INSERT INTO self_assessment (answer_id, score) VALUES (?, ?);",
+                    answer_id,
+                    num
+                )
+                .execute(tx.acquire().await?)
+                .await?
+                .rows_affected();
+                if rows_affected == 1 {
+                    break;
+                } else {
+                    panic!("Failed to write self-assessment to DB");
+                }
+            } else {
+                println!("I could not parse your answer. Please insert a number between 0 and 100")
+            }
+        }
+
         tx.commit().await?;
 
         if answer == card.back {
@@ -357,7 +404,8 @@ pub async fn review_deck(pool: &SqlitePool, id: i64) -> Result<(), sqlx::Error> 
             println!("Incorrect!");
             println!("The answer is: {}", card.back);
             incorrect += 1;
-            cards.push(card);
+            // append card to the front
+            cards.insert(0, card);
         }
     }
 
@@ -585,7 +633,7 @@ mod tests {
     #[tokio::test]
     async fn test_unique_deck_names() {
         let pool = create_transaction().await;
-        let mut tx = pool.begin().await.unwrap();
+        let tx = pool.begin().await.unwrap();
 
         create_deck(&pool, "deck".to_string(), Some("description".to_string()))
             .await
@@ -597,4 +645,5 @@ mod tests {
 
         tx.rollback().await.unwrap();
     }
+
 }

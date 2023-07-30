@@ -1,12 +1,6 @@
-mod auth;
-mod app;
-mod db;
-mod services;
-mod models;
-mod queries;
+// import from lib
 
-use app::start_app;
-use app::start_app_mvu;
+use ankirs::app::{start_app_mvu, start_app};
 
 use dotenv::dotenv;
 use sqlx::sqlite::SqlitePoolOptions;

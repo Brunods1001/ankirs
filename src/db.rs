@@ -2,7 +2,7 @@ use sqlx::{SqlitePool, sqlite::SqlitePoolOptions};
 
 
 pub struct DatabaseService {
-    pool: SqlitePool,
+    pub pool: SqlitePool,
 }
 
 impl DatabaseService {

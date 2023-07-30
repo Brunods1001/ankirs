@@ -3,3 +3,5 @@
 # don't persist SQL db
 *.db
 *.db-wal
+
+venv/

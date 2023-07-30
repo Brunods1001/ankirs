@@ -119,7 +119,7 @@ impl ProcessOption for DeckDetailMenuOptions {
             }
             DeckDetailMenuOptions::ListCards(id) => {
                 println!("Listing cards for deck with id {}", id);
-                list_cards_for_deck(pool, id).await?;
+                list_cards_for_deck(pool, &id).await?;
                 return Ok((MenuState::DeckDetailMenu(id), true));
             }
             DeckDetailMenuOptions::AddCard(id) => {

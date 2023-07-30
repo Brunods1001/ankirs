@@ -1,6 +1,17 @@
 # Features
 I can use Anki to create decks, cards, and study them. I can also create a user account and login to save my progress.
 I can have sessions where I drill a deck. The results get stored in the database. I can view reports on my progress.
+- [ ] Self-assessment:
+    - [ ] After answering a card, I can grade myself on how well I did.
+    - [ ] Save the grade to the self-assessment table
+- [ ] Reports:
+    - [ ] use functions to generate reports
+    - [ ] needs to compare given answer with correct answer
+    - [ ] a modular solution that can use different algorithms
+    - [ ] can it be its own library that uses trait objects?:
+        - [ ] Maybe it can generate reports based on data
+- [ ] Recommender:
+    - [ ] use report API to recommend cards to study
 - [o] Card:
     - [o] Create migration file for card:
         - [X] id, name, front, back, created_at, updated_at
@@ -29,11 +40,8 @@ I can have sessions where I drill a deck. The results get stored in the database
 - [ ] User:
     - [ ] CRUD user
     - [ ] auth
-- [ ] Reports:
-    - [ ] use functions to generate reports
-    - [ ] needs to compare given answer with correct answer
-    - [ ] a modular solution that can use different algorithms
 
+- [ ] BONUS: Create a notes directory with markdown... have a module that converts the notes to anki cards and saves to DB
 - [ ] BONUS: Use as a library for a web app using Leptos
 - [ ] BONUS: Add TUI support for reports
 - [ ] BONUS: Create a Tauri app:
