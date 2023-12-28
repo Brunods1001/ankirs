@@ -2,6 +2,8 @@
 name = "ankirs"
 version = "0.1.0"
 edition = "2021"
+license = "MIT"
+description = "Ankirs is a simple implementation of Anki flashcards using a local SQLite database."
 
 
 [dependencies]
